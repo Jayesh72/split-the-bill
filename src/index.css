@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-color: #EEF2F6;
+    --card-surface: #FFFFFF;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: #0F172A;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Soft Neumorphism & Tactile Shadows */
+.neumorphic-card {
+  background: #FFFFFF;
+  box-shadow: 0 10px 30px -4px rgba(15, 23, 42, 0.05), 0 4px 12px -2px rgba(15, 23, 42, 0.025);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.neumorphic-card-hover {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neumorphic-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.08), 0 6px 16px -3px rgba(15, 23, 42, 0.04);
+}
+
+.neumorphic-inset {
+  background: #F8FAFC;
+  box-shadow: inset 0 2px 4px 0 rgba(15, 23, 42, 0.03);
+  border: 1px solid #E2E8F0;
+}
+
+.neumorphic-btn-primary {
+  background-color: #0D766E;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px 0 rgba(13, 118, 110, 0.35);
+  transition: all 0.2s ease;
+}
+
+.neumorphic-btn-primary:hover {
+  background-color: #0F766E;
+  box-shadow: 0 6px 18px 0 rgba(13, 118, 110, 0.45);
+  transform: translateY(-1px);
+}
+
+.neumorphic-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px 0 rgba(13, 118, 110, 0.3);
+}
+
+.neumorphic-btn-secondary {
+  background: #FFFFFF;
+  color: #1E293B;
+  box-shadow: 0 2px 6px 0 rgba(15, 23, 42, 0.05);
+  border: 1px solid #E2E8F0;
+  transition: all 0.2s ease;
+}
+
+.neumorphic-btn-secondary:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  transform: translateY(-1px);
+}
