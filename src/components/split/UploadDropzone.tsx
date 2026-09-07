@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { FolderOpen, Camera, Clipboard, Sparkles, X, AlertCircle, FileImage, ShieldAlert } from 'lucide-react';
+import { FolderOpen, X, AlertCircle, FileImage, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LogoIcon } from '@/components/ui/LogoIcon';
 
 const MAX_FILES = 5;
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB per image
 const ALLOWED_EXTENSIONS = ['.png', '.jpeg', '.jpg', '.webp', '.heic', '.pdf', '.bmp', '.tiff'];
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_UPLOADS_PER_WINDOW = 5;
@@ -12,13 +13,11 @@ const MIN_COOLDOWN_MS = 2000; // 2s cooldown
 interface UploadDropzoneProps {
   files: File[];
   onFilesChange: (files: File[]) => void;
-  onSampleSelected: () => void;
 }
 
 export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
   files,
   onFilesChange,
-  onSampleSelected,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -76,19 +75,26 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
 
       const validFiles: File[] = [];
       const invalidNames: string[] = [];
+      const oversizedNames: string[] = [];
 
       Array.from(incomingFiles).forEach((file) => {
         const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-        if (ALLOWED_EXTENSIONS.includes(extension)) {
-          validFiles.push(file);
-        } else {
+        if (!ALLOWED_EXTENSIONS.includes(extension)) {
           invalidNames.push(file.name);
+        } else if (file.size > MAX_FILE_SIZE_BYTES) {
+          oversizedNames.push(file.name);
+        } else {
+          validFiles.push(file);
         }
       });
 
       if (invalidNames.length > 0) {
         setErrorMessage(
           `Unsupported file type for: ${invalidNames.join(', ')}. Allowed extensions: ${ALLOWED_EXTENSIONS.join(', ')}`
+        );
+      } else if (oversizedNames.length > 0) {
+        setErrorMessage(
+          `File exceeds 5MB limit: ${oversizedNames.join(', ')}. Maximum 5MB allowed per image.`
         );
       }
 
@@ -156,7 +162,6 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
     if (e.target.files && e.target.files.length > 0) {
       validateAndAddFiles(e.target.files);
     }
-    // reset input value so re-selecting same file works
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -209,9 +214,9 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
       </h2>
 
       {/* Description */}
-      <p className="text-xs text-charcoal-500 max-w-md mx-auto leading-relaxed mb-4">
-        Supports <span className="font-semibold text-charcoal-700">PNG, JPEG, JPG, WebP, HEIC, PDF</span> up to 25MB.
-        Upload maximum <span className="font-semibold text-charcoal-700">{MAX_FILES} images</span> at a time.
+      <p className="text-xs text-charcoal-500 max-w-md mx-auto leading-relaxed mb-6">
+        Supports <span className="font-semibold text-charcoal-700">PNG, JPEG, JPG, WebP, HEIC, PDF</span> up to <span className="font-semibold text-charcoal-700">5MB per image</span>.
+        Upload up to <span className="font-semibold text-charcoal-700">{MAX_FILES} images</span> at a time.
       </p>
 
       {/* Error / Rate limit Notice */}
@@ -230,7 +235,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
       )}
 
       {/* Primary Action Button: Browse Files */}
-      <div className="mb-6">
+      <div>
         <button
           type="button"
           disabled={files.length >= MAX_FILES}
@@ -238,13 +243,13 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
           className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white hover:bg-charcoal-50 disabled:opacity-50 disabled:pointer-events-none border border-charcoal-200/90 shadow-sm text-xs sm:text-sm font-bold text-charcoal-800 transition-all hover:border-charcoal-300 hover:shadow active:scale-[0.99] cursor-pointer"
         >
           <FolderOpen className="w-4 h-4 text-charcoal-600" />
-          <span>Browse Files ({files.length}/{MAX_FILES})</span>
+          <span>Browse Files</span>
         </button>
       </div>
 
       {/* Selected Files List */}
       {files.length > 0 && (
-        <div className="mb-6 max-w-lg mx-auto text-left">
+        <div className="mt-6 max-w-lg mx-auto text-left">
           <div className="flex items-center justify-between text-xs font-bold text-charcoal-700 mb-2 px-1">
             <span>Selected Files ({files.length}/{MAX_FILES})</span>
             <button
@@ -279,7 +284,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
                 <button
                   type="button"
                   onClick={() => handleRemoveFile(idx)}
-                  className="w-6 h-6 rounded-full hover:bg-charcoal-200 flex items-center justify-center text-charcoal-500 hover:text-charcoal-800 transition-colors flex-shrink-0"
+                  className="w-6 h-6 rounded-full hover:bg-charcoal-200 flex items-center justify-center text-charcoal-500 hover:text-charcoal-800 transition-colors flex-shrink-0 cursor-pointer"
                   aria-label={`Remove ${file.name}`}
                 >
                   <X className="w-3.5 h-3.5" />
@@ -289,40 +294,6 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
           </div>
         </div>
       )}
-
-      {/* Quick Action Badges */}
-      <div className="flex flex-wrap items-center justify-center gap-2.5 pt-4 border-t border-charcoal-100/90">
-        <button
-          type="button"
-          disabled={files.length >= MAX_FILES}
-          onClick={() => fileInputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-charcoal-50 disabled:opacity-50 border border-charcoal-200 text-xs font-semibold text-charcoal-700 shadow-sm transition-all cursor-pointer"
-        >
-          <Camera className="w-3.5 h-3.5 text-charcoal-500" />
-          <span>Open Camera</span>
-        </button>
-
-        <button
-          type="button"
-          disabled={files.length >= MAX_FILES}
-          onClick={() => {
-            // Focus trigger for paste
-          }}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-charcoal-50 disabled:opacity-50 border border-charcoal-200 text-xs font-semibold text-charcoal-700 shadow-sm transition-all cursor-pointer"
-        >
-          <Clipboard className="w-3.5 h-3.5 text-charcoal-500" />
-          <span>Paste Screenshot (Ctrl+V)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onSampleSelected}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#E6F4EA] hover:bg-[#d5eee0] border border-[#A7F3D0]/80 text-xs font-bold text-[#0D766E] shadow-sm transition-all cursor-pointer"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-[#0D766E]" />
-          <span>Sample: The Olive Table</span>
-        </button>
-      </div>
     </div>
   );
 };

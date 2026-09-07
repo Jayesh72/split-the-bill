@@ -1,215 +1,286 @@
-import React from 'react';
-import { Check, Loader2, Circle, RotateCcw, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, Loader2, RotateCcw, ArrowRight, AlertCircle, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { parseReceiptWithGemini, fileToBase64, ExtractedReceiptData } from '@/lib/gemini';
+import { useBill } from '@/context/BillContext';
 
 interface OCRScannerCardProps {
+  files: File[];
   onReplacePhoto: () => void;
   onContinue: () => void;
 }
 
 export const OCRScannerCard: React.FC<OCRScannerCardProps> = ({
+  files,
   onReplacePhoto,
   onContinue,
 }) => {
-  const ocrStatuses = [
-    {
-      id: 1,
-      label: 'Image uploaded & auto-enhanced',
-      timing: '0.4s',
-      status: 'done',
-    },
-    {
-      id: 2,
-      label: 'Receipt boundary detected',
-      timing: '0.8s',
-      status: 'done',
-    },
-    {
-      id: 3,
-      label: 'Restaurant: "The Olive Table"',
-      timing: 'Matched',
-      status: 'done',
-    },
-    {
-      id: 4,
-      label: 'Extracting dishes & prices (6 items)...',
-      timing: 'Running',
-      status: 'running',
-    },
-    {
-      id: 5,
-      label: 'Proportional tax & service calculation...',
-      timing: 'Pending',
-      status: 'pending',
-    },
-  ];
+  const { setBillFromOCR } = useBill();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStep, setScanStep] = useState<number>(0);
+  const [extractedData, setExtractedData] = useState<ExtractedReceiptData | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const detectedItems = [
-    { name: '1x Burrata & Heirloom Peaches', amount: '$19.50' },
-    { name: '2x Pan Seared Salmon', amount: '$68.00' },
-    { name: '2x Rosemary Focaccia', amount: '$14.00' },
-  ];
+  // When files change, process the primary uploaded receipt image
+  useEffect(() => {
+    if (files.length === 0) {
+      setPreviewUrl(null);
+      setExtractedData(null);
+      setIsScanning(false);
+      setScanStep(0);
+      setErrorMessage(null);
+      return;
+    }
+
+    const primaryFile = files[0];
+    const objectUrl = URL.createObjectURL(primaryFile);
+    setPreviewUrl(objectUrl);
+    setErrorMessage(null);
+    setIsScanning(true);
+    setScanStep(1);
+
+    const runExtraction = async () => {
+      try {
+        // Step progression simulation while API processes
+        const t1 = setTimeout(() => setScanStep(2), 500);
+        const t2 = setTimeout(() => setScanStep(3), 1200);
+
+        const base64 = await fileToBase64(primaryFile);
+        const result = await parseReceiptWithGemini(base64, primaryFile.type || 'image/jpeg');
+
+        clearTimeout(t1);
+        clearTimeout(t2);
+
+        setExtractedData(result);
+        setBillFromOCR(result, objectUrl);
+        setScanStep(4);
+        setIsScanning(false);
+      } catch (err: unknown) {
+        setIsScanning(false);
+        setScanStep(0);
+        const errObj = err as { message?: string };
+        setErrorMessage(
+          errObj.message || 'Failed to extract receipt data. Please check your Gemini API key.'
+        );
+      }
+    };
+
+    runExtraction();
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [files, setBillFromOCR]);
+
+  const currencySymbol = extractedData?.currency || '₹';
 
   return (
-    <div className="w-full bg-white rounded-3xl p-5 sm:p-6 shadow-[0_10px_30px_-4px_rgba(15,23,42,0.06),0_4px_12px_-2px_rgba(15,23,42,0.03)] border border-charcoal-200/90 flex flex-col justify-between">
+    <div className="w-full bg-white rounded-3xl p-5 sm:p-6 shadow-[0_10px_30px_-4px_rgba(15,23,42,0.06),0_4px_12px_-2px_rgba(15,23,42,0.03)] border border-charcoal-200/90 flex flex-col justify-between min-h-[460px]">
       <div>
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-charcoal-100">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                isScanning ? 'bg-amber-500 animate-ping' : files.length > 0 ? 'bg-emerald-500' : 'bg-charcoal-300'
+              }`}
+            ></span>
             <span className="text-sm font-bold text-charcoal-900">Live OCR Scanner</span>
           </div>
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#E6F4EA] text-[#0D766E] border border-[#A7F3D0]/70">
-            99.4% Accuracy
+            {isScanning ? 'Processing...' : extractedData ? '100% Extracted' : 'Ready'}
           </span>
         </div>
 
         {/* Scanner Image Preview Area */}
-        <div className="relative mt-4 mb-4 rounded-2xl overflow-hidden bg-slate-900 border border-charcoal-200 aspect-[16/10] sm:aspect-[16/9] flex items-center justify-center group">
-          {/* Background Mock Receipt Graphic */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 opacity-95"></div>
+        <div className="relative mt-4 mb-4 rounded-2xl overflow-hidden bg-slate-900 border border-charcoal-200 aspect-[16/10] sm:aspect-[16/9] flex items-center justify-center">
+          {previewUrl ? (
+            <>
+              {/* Actual Uploaded Image */}
+              <img
+                src={previewUrl}
+                alt="Uploaded Receipt"
+                className="w-full h-full object-contain p-2"
+              />
 
-          {/* Receipt Canvas Simulation */}
-          <div className="relative z-10 w-[78%] h-[85%] bg-[#FAF8F5] rounded-lg shadow-2xl p-3 sm:p-4 text-[9px] sm:text-[10px] text-charcoal-800 font-mono flex flex-col justify-between transform -rotate-1 border border-charcoal-300/60">
-            {/* Receipt Header */}
-            <div className="text-center border-b border-dashed border-charcoal-300 pb-1.5">
-              <div className="font-bold text-xs uppercase tracking-wider text-charcoal-900">
-                THE OLIVE TABLE
+              {/* Laser Scan Animation Overlay */}
+              {isScanning && (
+                <>
+                  <div className="absolute inset-0 bg-[#0D766E]/10 backdrop-blur-[1px]"></div>
+                  <div className="absolute inset-x-0 top-1/2 h-[3px] bg-gradient-to-r from-transparent via-[#2DD4BF] to-transparent shadow-[0_0_15px_#2DD4BF] z-30 animate-pulse"></div>
+                  <div className="absolute top-3 left-4 right-4 z-20 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-[#2DD4BF] text-[11px] font-bold text-[#2DD4BF] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2DD4BF]" />
+                      Extracting dishes & prices with Gemini AI...
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {/* Extracted Bounding Box Tag */}
+              {extractedData && !isScanning && (
+                <div className="absolute top-3 left-4 right-4 z-20 px-3 py-1 rounded-xl bg-slate-900/80 border border-emerald-400 text-[11px] font-bold text-emerald-400 backdrop-blur-[2px] flex items-center justify-between">
+                  <span>{extractedData.restaurantName || 'Receipt Extracted'}</span>
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1 text-[10px]">
+                    <Check className="w-3 h-3 stroke-[3]" /> Verified
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Empty State Placeholder */
+            <div className="flex flex-col items-center justify-center text-center p-6 text-charcoal-400">
+              <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 mb-3">
+                <FileText className="w-6 h-6" />
               </div>
-              <div className="text-[8px] text-charcoal-500">100ft Rd, Indiranagar • Bill #89241</div>
+              <p className="text-xs font-semibold text-slate-300 mb-1">
+                No receipt uploaded yet
+              </p>
+              <p className="text-[11px] text-slate-500 max-w-xs">
+                Upload or drop a receipt on the left to start live Gemini OCR extraction.
+              </p>
             </div>
-
-            {/* Receipt Line Items Mock */}
-            <div className="flex flex-col gap-1 py-1 text-charcoal-700">
-              <div className="flex justify-between">
-                <span>1 Butter Chicken</span>
-                <span>$24.50</span>
-              </div>
-              <div className="flex justify-between">
-                <span>1 Paneer Tikka</span>
-                <span>$18.00</span>
-              </div>
-              <div className="flex justify-between">
-                <span>2 Garlic Naan</span>
-                <span>$9.00</span>
-              </div>
-              <div className="flex justify-between font-semibold text-charcoal-900 pt-0.5 border-t border-dashed border-charcoal-200">
-                <span>Subtotal</span>
-                <span>$148.50</span>
-              </div>
-            </div>
-
-            {/* Receipt Footer */}
-            <div className="text-center text-[7px] text-charcoal-400">
-              *** THANK YOU FOR DINING WITH US ***
-            </div>
-          </div>
-
-          {/* OCR Cyan Overlays */}
-          {/* Top Bounding Box */}
-          <div className="absolute top-4 left-6 right-6 z-20 px-2.5 py-1 rounded bg-[#0D766E]/20 border border-[#2DD4BF] text-[10px] font-bold text-[#2DD4BF] backdrop-blur-[2px] flex items-center justify-between">
-            <span>Restaurant: The Olive Table</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#2DD4BF] animate-ping"></span>
-          </div>
-
-          {/* Glowing Laser Scan Bar */}
-          <div className="absolute inset-x-0 top-1/2 h-[2px] bg-gradient-to-r from-transparent via-[#2DD4BF] to-transparent shadow-[0_0_12px_#2DD4BF] z-30 animate-pulse"></div>
-
-          {/* Bottom Bounding Box */}
-          <div className="absolute bottom-4 left-6 right-6 z-20 px-2.5 py-1 rounded bg-[#0D766E]/20 border border-[#2DD4BF] text-[10px] font-bold text-[#2DD4BF] backdrop-blur-[2px] flex items-center justify-between">
-            <span>Subtotal: $148.50 + Tax</span>
-            <span className="text-emerald-400 font-semibold flex items-center gap-0.5 text-[9px]">
-              <Check className="w-2.5 h-2.5" /> Bounded
-            </span>
-          </div>
+          )}
         </div>
 
+        {/* Error message */}
+        {errorMessage && (
+          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium my-3 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold">OCR Extraction Error</div>
+              <div>{errorMessage}</div>
+            </div>
+          </div>
+        )}
+
         {/* OCR Status List */}
-        <div className="flex flex-col gap-2 py-3 border-y border-charcoal-100">
-          {ocrStatuses.map((item) => (
-            <div key={item.id} className="flex items-center justify-between text-xs">
+        {files.length > 0 && (
+          <div className="flex flex-col gap-2 py-3 border-y border-charcoal-100">
+            {/* Step 1: Upload */}
+            <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                {item.status === 'done' && (
+                <div className="w-4 h-4 rounded-full bg-[#E6F4EA] text-[#0D766E] flex items-center justify-center flex-shrink-0">
+                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                </div>
+                <span className="text-charcoal-700 font-medium">Image uploaded & enhanced</span>
+              </div>
+              <span className="text-charcoal-500 font-medium text-[11px]">Ready</span>
+            </div>
+
+            {/* Step 2: Extraction */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                {scanStep >= 3 ? (
                   <div className="w-4 h-4 rounded-full bg-[#E6F4EA] text-[#0D766E] flex items-center justify-center flex-shrink-0">
                     <Check className="w-2.5 h-2.5 stroke-[3]" />
                   </div>
-                )}
-                {item.status === 'running' && (
+                ) : isScanning ? (
                   <Loader2 className="w-4 h-4 text-[#0D766E] animate-spin flex-shrink-0" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full border border-charcoal-300 flex-shrink-0" />
                 )}
-                {item.status === 'pending' && (
-                  <Circle className="w-4 h-4 text-charcoal-300 flex-shrink-0" />
-                )}
-                <span
-                  className={
-                    item.status === 'pending'
-                      ? 'text-charcoal-400 font-medium'
-                      : 'text-charcoal-700 font-medium'
-                  }
-                >
-                  {item.label}
+                <span className="text-charcoal-700 font-medium">
+                  {extractedData?.restaurantName
+                    ? `Restaurant: "${extractedData.restaurantName}"`
+                    : 'Extracting dishes & prices...'}
                 </span>
               </div>
-
-              <span
-                className={
-                  item.status === 'done'
-                    ? item.timing === 'Matched'
-                      ? 'text-[#0D766E] font-bold text-[11px]'
-                      : 'text-charcoal-500 font-medium text-[11px]'
-                    : item.status === 'running'
-                    ? 'text-[#0D766E] font-bold text-[11px]'
-                    : 'text-charcoal-400 font-medium text-[11px]'
-                }
-              >
-                {item.timing}
+              <span className="text-[#0D766E] font-bold text-[11px]">
+                {scanStep >= 3 ? 'Matched' : isScanning ? 'Running' : 'Pending'}
               </span>
             </div>
-          ))}
-        </div>
 
-        {/* Detected Items Section */}
-        <div className="pt-3">
-          <div className="flex items-center justify-between text-[11px] font-bold text-charcoal-400 uppercase tracking-wider mb-2">
-            <span>Item Detected</span>
-            <span>Amount</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            {detectedItems.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between text-xs py-1 border-b border-charcoal-50 last:border-none"
-              >
-                <span className="font-semibold text-charcoal-800">{item.name}</span>
-                <span className="font-bold text-charcoal-900">{item.amount}</span>
+            {/* Step 3: Tax Calculation */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                {extractedData ? (
+                  <div className="w-4 h-4 rounded-full bg-[#E6F4EA] text-[#0D766E] flex items-center justify-center flex-shrink-0">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                  </div>
+                ) : (
+                  <span className="w-4 h-4 rounded-full border border-charcoal-300 flex-shrink-0" />
+                )}
+                <span className="text-charcoal-700 font-medium">
+                  Taxes & calculations ({currencySymbol}{extractedData?.grandTotal?.toFixed(2) || '0.00'})
+                </span>
               </div>
-            ))}
+              <span className="text-[#0D766E] font-bold text-[11px]">
+                {extractedData ? 'Done' : 'Pending'}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Real Extracted Items Section */}
+        {extractedData && extractedData.items.length > 0 && (
+          <div className="pt-3">
+            <div className="flex items-center justify-between text-[11px] font-bold text-charcoal-400 uppercase tracking-wider mb-2">
+              <span>Item Detected ({extractedData.items.length})</span>
+              <span>Amount</span>
+            </div>
+
+            <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+              {extractedData.items.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between text-xs py-1 border-b border-charcoal-50 last:border-none"
+                >
+                  <span className="font-semibold text-charcoal-800">
+                    {item.qty > 1 ? `${item.qty}x ` : ''}
+                    {item.name}
+                  </span>
+                  <span className="font-bold text-charcoal-900">
+                    {currencySymbol}{item.price.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Subtotal & Grand Total Summary */}
+            <div className="mt-3 pt-2.5 border-t border-charcoal-100 flex items-center justify-between text-xs">
+              <span className="font-bold text-charcoal-700">Grand Total</span>
+              <span className="font-extrabold text-sm text-[#0D766E]">
+                {currencySymbol}{extractedData.grandTotal.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Fallback when no files are uploaded */}
+        {files.length === 0 && (
+          <div className="py-6 text-center text-charcoal-400 text-xs">
+            <Sparkles className="w-5 h-5 text-brand mx-auto mb-2 opacity-60" />
+            <span>Upload an image to see real-time AI dish & price extraction</span>
+          </div>
+        )}
       </div>
 
       {/* OCR Card Bottom Actions */}
-      <div className="flex items-center gap-3 pt-5 mt-4 border-t border-charcoal-100">
-        <button
-          type="button"
-          onClick={onReplacePhoto}
-          className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-white hover:bg-charcoal-50 border border-charcoal-200 text-xs font-bold text-charcoal-700 shadow-sm transition-all"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-charcoal-500" />
-          <span>Replace Photo</span>
-        </button>
+      {files.length > 0 && (
+        <div className="flex items-center gap-3 pt-4 mt-4 border-t border-charcoal-100">
+          <button
+            type="button"
+            onClick={onReplacePhoto}
+            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-white hover:bg-charcoal-50 border border-charcoal-200 text-xs font-bold text-charcoal-700 shadow-sm transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-charcoal-500" />
+            <span>Replace Photo</span>
+          </button>
 
-        <Button
-          variant="primary"
-          size="md"
-          onClick={onContinue}
-          className="flex-1 py-3 bg-[#0D766E] hover:bg-[#0B615A] text-xs sm:text-sm font-bold shadow-[0_4px_14px_rgba(13,118,110,0.35)] justify-center"
-        >
-          <span>Continue to Review Bill</span>
-          <ArrowRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={onContinue}
+            disabled={isScanning || !extractedData}
+            className="flex-1 py-3 bg-[#0D766E] hover:bg-[#0B615A] text-xs sm:text-sm font-bold shadow-[0_4px_14px_rgba(13,118,110,0.35)] justify-center"
+          >
+            <span>Continue to Review Bill</span>
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

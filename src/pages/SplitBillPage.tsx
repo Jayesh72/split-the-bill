@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { BillProgressStepper } from '@/components/split/BillProgressStepper';
@@ -10,22 +11,14 @@ import { SplitFeatureCards } from '@/components/split/SplitFeatureCards';
 
 export const SplitBillPage: React.FC = () => {
   const [files, setFiles] = useState<File[]>([]);
-
-  const handleSampleSelected = () => {
-    // Create a mock sample file representation
-    const sampleBlob = new Blob(['Sample Olive Table Bill'], { type: 'image/jpeg' });
-    const sampleFile = new File([sampleBlob], 'The_Olive_Table_Bill_89241.jpg', {
-      type: 'image/jpeg',
-    });
-    setFiles([sampleFile]);
-  };
+  const navigate = useNavigate();
 
   const handleReplacePhoto = () => {
     setFiles([]);
   };
 
   const handleContinue = () => {
-    // Prepared for Review step in next phase
+    navigate('/review');
   };
 
   return (
@@ -37,7 +30,7 @@ export const SplitBillPage: React.FC = () => {
           {/* Progress Stepper */}
           <BillProgressStepper />
 
-          {/* Page Heading (without right badges) */}
+          {/* Page Heading */}
           <SplitHeader />
 
           {/* Main 2-Column Upload & Live Scanner Area */}
@@ -47,14 +40,14 @@ export const SplitBillPage: React.FC = () => {
               <UploadDropzone
                 files={files}
                 onFilesChange={setFiles}
-                onSampleSelected={handleSampleSelected}
               />
               <PrivacyNotice />
             </div>
 
-            {/* Right Column: Live OCR Scanner Card (5 cols) */}
+            {/* Right Column: Dynamic Live OCR Scanner Card (5 cols) */}
             <div className="lg:col-span-5 flex flex-col">
               <OCRScannerCard
+                files={files}
                 onReplacePhoto={handleReplacePhoto}
                 onContinue={handleContinue}
               />

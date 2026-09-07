@@ -1,3 +1,32 @@
+export interface BillItem {
+  id: string | number;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  totalPrice: number;
+  confidence?: number;
+  isShared?: boolean;
+  assignedTo?: string[];
+}
+
+export interface Bill {
+  id: string;
+  restaurantName: string;
+  address?: string;
+  dateTime?: string;
+  billNumber?: string;
+  currency: string;
+  items: BillItem[];
+  subtotal: number;
+  tax: number;
+  taxRate: number;
+  serviceCharge: number;
+  serviceChargeRate: number;
+  receiptTotal: number;
+  grandTotal: number;
+  receiptImagePreviewUrl?: string;
+}
+
 export interface ReceiptItem {
   id: number;
   name: string;
@@ -30,3 +59,4 @@ export interface BillSummary {
   serviceChargeRate: number;
   grandTotal: number;
 }
+
