@@ -1,9 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LogoIcon } from '@/components/ui/LogoIcon';
 
 export const CtaSection: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
       {/* Neumorphic CTA Box */}
@@ -29,6 +32,7 @@ export const CtaSection: React.FC = () => {
           <Button
             variant="primary"
             size="lg"
+            onClick={() => navigate('/split')}
             className="w-full sm:w-auto px-8 py-4 text-base font-bold bg-[#0D766E] hover:bg-[#0B615A] shadow-[0_8px_20px_-2px_rgba(13,118,110,0.4)]"
           >
             Start Splitting Now — It's Free

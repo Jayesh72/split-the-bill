@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  ExternalLink,
   Info,
   Check,
   Share2,
@@ -12,6 +12,7 @@ import { LogoIcon } from '@/components/ui/LogoIcon';
 
 export const ReceiptPreviewCard: React.FC = () => {
   const [copied, setCopied] = useState(false);
+  const navigate = useNavigate();
 
   const handleCopy = () => {
     setCopied(true);
@@ -123,14 +124,6 @@ export const ReceiptPreviewCard: React.FC = () => {
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-charcoal-50 border border-charcoal-200 shadow-sm text-xs sm:text-sm font-semibold text-charcoal-800 transition-all hover:border-charcoal-300 self-start sm:self-auto cursor-pointer"
-          >
-            <span>Open This Bill in Split Studio</span>
-            <ExternalLink className="w-3.5 h-3.5 text-charcoal-600" />
-          </button>
         </div>
 
         {/* 2-Column Split Content */}
@@ -141,7 +134,10 @@ export const ReceiptPreviewCard: React.FC = () => {
               <span className="text-[11px] font-bold tracking-wider text-charcoal-500 uppercase">
                 DETECTED RECEIPT ITEMS (6)
               </span>
-              <span className="text-[11px] font-semibold text-[#0D766E] hover:underline cursor-pointer">
+              <span
+                onClick={() => navigate('/split')}
+                className="text-[11px] font-semibold text-[#0D766E] hover:underline cursor-pointer"
+              >
                 Tapped to reassign
               </span>
             </div>
@@ -151,6 +147,7 @@ export const ReceiptPreviewCard: React.FC = () => {
               {receiptItems.map((item) => (
                 <div
                   key={item.id}
+                  onClick={() => navigate('/split')}
                   className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white border border-charcoal-200/90 shadow-[0_2px_6px_0_rgba(15,23,42,0.03)] hover:shadow-soft hover:border-brand-200 transition-all group cursor-pointer"
                 >
                   <div className="flex items-center gap-3">

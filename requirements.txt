@@ -1,0 +1,8 @@
+# Split the Bill — Dependency Notice
+#
+# This project is a frontend React + TypeScript + Vite web application.
+# All application dependencies are managed via Node.js / npm in `package.json`.
+# No Python runtime or Python packages are required to build or run this application.
+#
+# To install project dependencies, run:
+#   npm install

@@ -1,8 +1,11 @@
 import React from 'react';
-import { ArrowRight, Utensils, ArrowDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export const Hero: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="pt-8 pb-6 sm:pt-14 sm:pb-10 text-center max-w-4xl mx-auto px-4 sm:px-6">
       {/* Top Pill Badge */}
@@ -24,40 +27,17 @@ export const Hero: React.FC = () => {
         get the exact amount each person owes in seconds. 100% free, no login needed.
       </p>
 
-      {/* CTA Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        {/* Primary CTA */}
+      {/* Centered CTA Action Button */}
+      <div className="flex items-center justify-center">
         <Button
           variant="primary"
           size="lg"
+          onClick={() => navigate('/split')}
           className="w-full sm:w-auto px-8 py-3.5 text-base font-bold bg-[#0D766E] hover:bg-[#0B615A] shadow-[0_8px_20px_-2px_rgba(13,118,110,0.4)]"
         >
           Get Started
           <ArrowRight className="w-4 h-4 ml-1" />
         </Button>
-
-        {/* Demo Widget Pill Card */}
-        <a
-          href="#preview"
-          className="w-full sm:w-auto flex items-center justify-between gap-5 px-4 py-2.5 rounded-2xl bg-white border border-charcoal-200 shadow-soft hover:shadow-soft-lg hover:border-charcoal-300 transition-all text-left group cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#E6F4EA] text-[#0D766E] flex items-center justify-center">
-              <Utensils className="w-4 h-4 text-[#0D766E]" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-charcoal-900 group-hover:text-[#0D766E] transition-colors">
-                Try Demo
-              </div>
-              <div className="text-[11px] text-charcoal-500 font-medium">
-                The Olive Table <span className="font-semibold text-charcoal-800">₹2,048</span>
-              </div>
-            </div>
-          </div>
-          <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-[#D1FAE5] text-[#059669] border border-[#A7F3D0]/80">
-            Instant
-          </span>
-        </a>
       </div>
 
       {/* See how it works indicator */}
