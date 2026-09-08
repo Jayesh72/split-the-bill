@@ -11,6 +11,7 @@ import {
   Edit3,
   Check,
   Info,
+  UserCheck,
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { PersonShareSummary, DiningCompanion } from '@/types';
@@ -22,7 +23,7 @@ import { isValidUpiId, generateUpiUri } from '@/lib/upi';
 interface UpiPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  shareSummary: PersonShareSummary | null;
+  shareSummary?: PersonShareSummary | null;
   payer: DiningCompanion | null;
   restaurantName: string;
 }
@@ -44,9 +45,10 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
   const [isEditingUpi, setIsEditingUpi] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Payee name & calculated amount
+  // Payee name & calculated amount (only set if paying for an individual diner share)
   const payeeName = payer?.name || 'Split Organizer';
   const amount = shareSummary ? shareSummary.totalShare : 0;
+  const isIndividualShare = Boolean(shareSummary && amount > 0);
   const transactionNote = `Split bill for ${restaurantName || 'Meal'}`;
 
   // Keep local input in sync with context upiId
@@ -65,13 +67,13 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
     ? generateUpiUri({
         upiId: upiId!,
         payeeName,
-        amount,
+        amount: isIndividualShare ? amount : undefined,
         transactionNote,
       })
     : '';
 
   useEffect(() => {
-    if (!isOpen || !hasValidUpi || !upiUri || amount <= 0) {
+    if (!isOpen || !hasValidUpi || !upiUri) {
       setQrDataUrl('');
       return;
     }
@@ -86,9 +88,9 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
     })
       .then((url) => setQrDataUrl(url))
       .catch((err) => console.error('Failed to generate QR code', err));
-  }, [isOpen, hasValidUpi, upiUri, amount]);
+  }, [isOpen, hasValidUpi, upiUri]);
 
-  if (!isOpen || !shareSummary) return null;
+  if (!isOpen) return null;
 
   const handleSaveUpiId = (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +100,7 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
       return;
     }
     if (!isValidUpiId(trimmed)) {
-      setErrorMsg('Please enter a valid UPI ID format (e.g. username@provider).');
+      setErrorMsg('Please enter a valid UPI ID format (e.g. 7440487705@ibl, rahul@okaxis).');
       return;
     }
     setUpiId(trimmed);
@@ -147,10 +149,10 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
           </div>
           <div>
             <h3 className="font-extrabold text-lg text-charcoal-900">
-              UPI Instant Payment
+              {isIndividualShare ? 'Individual Share Payment' : 'Payer Bank Account QR'}
             </h3>
             <p className="text-xs text-charcoal-500 font-medium">
-              Scan with Google Pay, PhonePe, Paytm or any UPI app
+              Scan with Google Pay, PhonePe, Paytm, BHIM or any UPI app
             </p>
           </div>
         </div>
@@ -159,15 +161,18 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
         <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-charcoal-200/80 mb-4 flex items-center justify-between">
           <div>
             <span className="text-[11px] font-bold text-charcoal-400 uppercase tracking-wider block">
-              Paying for {shareSummary.person.name}
+              {isIndividualShare ? `Paying for ${shareSummary?.person.name}` : 'Payment Share'}
             </span>
-            <span className="text-2xl font-extrabold text-[#0D766E] tracking-tight">
-              {formatCurrency(amount)}
+            <span className="text-xl sm:text-2xl font-extrabold text-[#0D766E] tracking-tight">
+              {isIndividualShare ? formatCurrency(amount) : 'Enter Share on Scan'}
             </span>
           </div>
 
           <div className="text-right text-xs">
-            <span className="text-charcoal-500 block">Payee</span>
+            <span className="text-charcoal-500 flex items-center justify-end gap-1">
+              <UserCheck className="w-3 h-3 text-amber-600" />
+              Bill Paid by
+            </span>
             <strong className="font-bold text-charcoal-900 block">{payeeName}</strong>
           </div>
         </div>
@@ -179,10 +184,10 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
               <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <h4 className="text-xs font-bold text-amber-900">
-                  {hasValidUpi ? 'Update Payee UPI ID' : 'Add your UPI ID to enable payments'}
+                  {hasValidUpi ? 'Update Payee UPI ID' : 'Enter Organizer / Payer UPI ID'}
                 </h4>
                 <p className="text-[11px] text-amber-700 font-medium mt-0.5">
-                  Enter your actual UPI ID. We don't verify ownership of the ID.
+                  Enter the real UPI ID of the person who paid the bill to generate their payment QR.
                 </p>
               </div>
             </div>
@@ -196,7 +201,7 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
                     setInputUpi(e.target.value.trim());
                     setErrorMsg('');
                   }}
-                  placeholder="e.g. rahul@okaxis, priya@oksbi"
+                  placeholder="e.g. 7440487705@ibl, rahul@okaxis"
                   className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-xs sm:text-sm font-mono text-charcoal-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                   autoFocus
                 />
@@ -246,18 +251,20 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
-                  alt={`UPI QR Code to pay ${formatCurrency(amount)}`}
+                  alt={`UPI QR Code to pay ${payeeName}`}
                   className="w-52 h-52 rounded-xl object-contain shadow-sm"
                 />
               ) : (
                 <div className="w-52 h-52 flex items-center justify-center text-xs text-charcoal-400 font-medium">
-                  Generating dynamic QR code...
+                  Generating UPI QR code...
                 </div>
               )}
 
-              <span className="text-[11px] text-charcoal-500 font-medium mt-2 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-                Dynamic QR with exact amount ({formatCurrency(amount)})
+              <span className="text-[11px] text-charcoal-500 font-medium mt-2 flex items-center gap-1 text-center">
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                {isIndividualShare
+                  ? `Dynamic QR for ${payeeName} (${formatCurrency(amount)})`
+                  : `Bank QR for ${payeeName} • Each diner enters their share`}
               </span>
             </div>
 
@@ -305,14 +312,20 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
 
             {/* Mobile UPI App Intent Button & Actions */}
             <div className="space-y-2 mb-4">
-              <a
-                href={upiUri}
-                className="w-full py-2.5 px-4 rounded-2xl bg-[#0D766E] hover:bg-[#0B645E] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-teal-700/10 cursor-pointer transition-colors"
-              >
-                <Smartphone className="w-4 h-4" />
-                <span>Pay {formatCurrency(amount)}</span>
-                <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-              </a>
+              {upiUri && (
+                <a
+                  href={upiUri}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-[#0D766E] hover:bg-[#0B645E] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-teal-700/10 cursor-pointer transition-colors"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>
+                    {isIndividualShare
+                      ? `Pay ${formatCurrency(amount)} with UPI`
+                      : `Open in UPI App`}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                </a>
+              )}
 
               <Button
                 variant="outline"
@@ -328,7 +341,7 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5 mr-1 text-charcoal-500" />
-                    <span>Copy Payment Link</span>
+                    <span>Copy UPI Payment Link</span>
                   </>
                 )}
               </Button>
@@ -340,7 +353,7 @@ export const UpiPaymentModal: React.FC<UpiPaymentModalProps> = ({
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-[10px] text-slate-500 leading-relaxed flex items-start gap-1.5">
           <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
           <span>
-            Payments are completed through your UPI app. Split the Bill does not process or verify payments.
+            Payments are completed directly through your UPI app. Split the Bill does not store or process payment funds.
           </span>
         </div>
       </div>

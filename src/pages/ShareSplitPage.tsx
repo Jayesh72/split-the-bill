@@ -27,8 +27,10 @@ export const ShareSplitPage: React.FC = () => {
     togglePaidStatus,
     markAllPaid,
     paidMembersCount,
+    companionsToSettleCount,
     totalPaidAmount,
     totalPendingAmount,
+    totalToCollectAmount,
     isAllMembersPaid,
     isAllItemsAssigned,
     unassignedItemsCount,
@@ -37,6 +39,7 @@ export const ShareSplitPage: React.FC = () => {
 
   // Selected diner for UPI payment modal
   const [selectedUpiShare, setSelectedUpiShare] = useState<PersonShareSummary | null>(null);
+  const [isPayerUpiModalOpen, setIsPayerUpiModalOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // Trigger print
@@ -188,15 +191,18 @@ export const ShareSplitPage: React.FC = () => {
                   payer={payer}
                   organizer={organizer}
                   companionCount={people.length}
+                  onOpenUpiModal={() => setIsPayerUpiModalOpen(true)}
                 />
 
                 <SettlementStatusCard
                   grandTotal={bill.grandTotal}
+                  totalToCollect={totalToCollectAmount}
                   totalPaidAmount={totalPaidAmount}
                   totalPendingAmount={totalPendingAmount}
                   paidMembersCount={paidMembersCount}
-                  totalMembersCount={people.length}
+                  totalMembersCount={companionsToSettleCount}
                   isAllMembersPaid={isAllMembersPaid}
+                  payerName={payer?.name || 'Payer'}
                   onToggleAllPaid={() => markAllPaid(!isAllMembersPaid)}
                 />
 
@@ -221,7 +227,9 @@ export const ShareSplitPage: React.FC = () => {
                   </div>
 
                   <span className="text-xs font-semibold text-charcoal-500">
-                    {paidMembersCount} of {people.length} marked paid
+                    {companionsToSettleCount > 0
+                      ? `${paidMembersCount} of ${companionsToSettleCount} companions settled`
+                      : 'All settled'}
                   </span>
                 </div>
 
@@ -234,10 +242,7 @@ export const ShareSplitPage: React.FC = () => {
                       isPaid={!!paidStatus[summary.person.id]}
                       isPayer={summary.person.id === payer?.id}
                       isOrganizer={summary.person.id === organizer?.id}
-                      restaurantName={bill.restaurantName}
-                      payer={payer}
                       onTogglePaid={() => togglePaidStatus(summary.person.id)}
-                      onOpenUpi={(share) => setSelectedUpiShare(share)}
                     />
                   ))}
                 </div>
@@ -257,8 +262,11 @@ export const ShareSplitPage: React.FC = () => {
 
       {/* UPI Payment Modal */}
       <UpiPaymentModal
-        isOpen={!!selectedUpiShare}
-        onClose={() => setSelectedUpiShare(null)}
+        isOpen={isPayerUpiModalOpen || !!selectedUpiShare}
+        onClose={() => {
+          setSelectedUpiShare(null);
+          setIsPayerUpiModalOpen(false);
+        }}
         shareSummary={selectedUpiShare}
         payer={payer}
         restaurantName={bill.restaurantName}

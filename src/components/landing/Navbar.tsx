@@ -61,28 +61,32 @@ export const Navbar: React.FC = () => {
 
         {/* Right: Actions */}
         <div className="hidden sm:flex items-center gap-3">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => navigate('/split')}
-            className="text-xs font-bold px-4 py-2 bg-[#0D766E] hover:bg-[#0B615A]"
-          >
-            Start Splitting
-            <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
+          {isHome && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/split')}
+              className="text-xs font-bold px-4 py-2 bg-[#0D766E] hover:bg-[#0B615A]"
+            >
+              Start Splitting
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
         <div className="sm:hidden flex items-center gap-2">
-          <Button
-            variant="primary"
-            size="sm"
-            className="text-xs px-3 py-1.5 bg-[#0D766E]"
-            onClick={() => navigate('/split')}
-          >
-            Start
-            <ArrowRight className="w-3 h-3" />
-          </Button>
+          {isHome && (
+            <Button
+              variant="primary"
+              size="sm"
+              className="text-xs px-3 py-1.5 bg-[#0D766E]"
+              onClick={() => navigate('/split')}
+            >
+              Start
+              <ArrowRight className="w-3 h-3" />
+            </Button>
+          )}
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -121,20 +125,22 @@ export const Navbar: React.FC = () => {
           >
             Split a Bill
           </button>
-          <div className="pt-2 border-t border-charcoal-100 flex flex-col gap-2">
-            <Button
-              variant="primary"
-              size="md"
-              className="w-full justify-center bg-[#0D766E]"
-              onClick={() => {
-                navigate('/split');
-                setMobileMenuOpen(false);
-              }}
-            >
-              Start Splitting
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
+          {isHome && (
+            <div className="pt-2 border-t border-charcoal-100 flex flex-col gap-2">
+              <Button
+                variant="primary"
+                size="md"
+                className="w-full justify-center bg-[#0D766E]"
+                onClick={() => {
+                  navigate('/split');
+                  setMobileMenuOpen(false);
+                }}
+              >
+                Start Splitting
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </header>

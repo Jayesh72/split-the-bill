@@ -112,7 +112,7 @@ export const OCRScannerCard: React.FC<OCRScannerCardProps> = ({
                   <div className="absolute top-3 left-4 right-4 z-20 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-[#2DD4BF] text-[11px] font-bold text-[#2DD4BF] flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2DD4BF]" />
-                      Extracting dishes & prices with FastAPI & OpenAI Vision...
+                      Extracting dishes & prices with FastAPI & Gemini Vision...
                     </span>
                   </div>
                 </>

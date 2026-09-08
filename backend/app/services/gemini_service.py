@@ -1,5 +1,6 @@
 import json
 import logging
+import asyncio
 from typing import Dict, Any, List, Optional
 from google import genai
 from google.genai import types
@@ -8,13 +9,12 @@ from app.schemas.ocr import ExtractedReceiptData
 
 logger = logging.getLogger("split_the_bill.gemini_service")
 
-# Candidate models tried in sequence for resilience
+# Candidate models ordered by performance and active availability
 CANDIDATE_GEMINI_MODELS: List[str] = [
     "gemini-3.6-flash",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",
 ]
 
 
@@ -106,18 +106,22 @@ class GeminiService:
             mime_type=clean_mime,
         )
 
+        def _generate(model_name: str) -> Optional[str]:
+            res = client.models.generate_content(
+                model=model_name,
+                contents=[prompt, image_part],
+            )
+            return res.text if res else None
+
         # Try candidate models sequentially until one succeeds
         last_error: Exception | None = None
         response_text: str | None = None
 
         for model_name in CANDIDATE_GEMINI_MODELS:
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[prompt, image_part],
-                )
-                if response and response.text:
-                    response_text = response.text
+                response_text = await asyncio.to_thread(_generate, model_name)
+                if response_text:
+                    logger.info("Successfully extracted receipt with model '%s'", model_name)
                     break
             except Exception as exc:
                 last_error = exc

@@ -51,20 +51,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# 1. CORS Middleware Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 2. Rate Limiter Middleware
+# 1. Rate Limiter Middleware
 app.add_middleware(
     RateLimiterMiddleware,
     max_requests=settings.RATE_LIMIT_MAX_REQUESTS,
     window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+)
+
+# 2. CORS Middleware Configuration (Outermost middleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 3. Mount Routers with /api prefix

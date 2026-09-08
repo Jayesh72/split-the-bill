@@ -23,7 +23,6 @@ interface BillContextType {
   setTaxRate: (rate: number) => void;
   setServiceChargeRate: (rate: number) => void;
   setBillFromOCR: (data: ExtractedReceiptData, imagePreviewUrl?: string) => void;
-  resetToDemoBill: () => void;
   isTotalsMatching: boolean;
   totalsDiff: number;
   
@@ -59,78 +58,32 @@ interface BillContextType {
   markAllPaid: (paid?: boolean) => void;
   paidMembersCount: number;
   pendingMembersCount: number;
+  companionsToSettleCount: number;
   totalPaidAmount: number;
   totalPendingAmount: number;
+  totalToCollectAmount: number;
+  payerShareAmount: number;
   isAllMembersPaid: boolean;
   payer: DiningCompanion | null;
   organizer: DiningCompanion | null;
   resetAll: () => void;
 }
 
-export const DEMO_BILL: Bill = {
-  id: 'demo-olive-table',
-  restaurantName: 'The Olive Table',
-  address: '100ft Road, Indiranagar, Bengaluru',
-  dateTime: 'Sep 7, 2026 • 9:42 PM',
-  billNumber: '#IND-89241',
+export const EMPTY_BILL: Bill = {
+  id: '',
+  restaurantName: '',
+  address: '',
+  dateTime: '',
+  billNumber: '',
   currency: '₹',
-  items: [
-    {
-      id: '1',
-      name: 'Butter Chicken',
-      qty: 1,
-      unitPrice: 420.0,
-      totalPrice: 420.0,
-      isShared: false,
-    },
-    {
-      id: '2',
-      name: 'Garlic Naan',
-      qty: 2,
-      unitPrice: 90.0,
-      totalPrice: 180.0,
-      isShared: true,
-    },
-    {
-      id: '3',
-      name: 'Paneer Tikka',
-      qty: 1,
-      unitPrice: 360.0,
-      totalPrice: 360.0,
-      isShared: false,
-    },
-    {
-      id: '4',
-      name: 'Coke',
-      qty: 2,
-      unitPrice: 40.0,
-      totalPrice: 80.0,
-      isShared: true,
-    },
-    {
-      id: '5',
-      name: 'Dal Makhani',
-      qty: 1,
-      unitPrice: 320.0,
-      totalPrice: 320.0,
-      isShared: false,
-    },
-    {
-      id: '6',
-      name: 'Gulab Jamun',
-      qty: 1,
-      unitPrice: 240.0,
-      totalPrice: 240.0,
-      isShared: false,
-    },
-  ],
-  subtotal: 1600.0,
-  tax: 288.0,
-  taxRate: 18,
-  serviceCharge: 160.0,
-  serviceChargeRate: 10,
-  receiptTotal: 2048.0,
-  grandTotal: 2048.0,
+  items: [],
+  subtotal: 0,
+  tax: 0,
+  taxRate: 5,
+  serviceCharge: 0,
+  serviceChargeRate: 0,
+  receiptTotal: 0,
+  grandTotal: 0,
 };
 
 const BillContext = createContext<BillContextType | undefined>(undefined);
@@ -159,7 +112,7 @@ function recalculateBill(bill: Bill): Bill {
 }
 
 export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [bill, setBill] = useState<Bill>(() => recalculateBill(DEMO_BILL));
+  const [bill, setBill] = useState<Bill>(EMPTY_BILL);
   // Clean empty people state - NO hardcoded default people
   const [people, setPeople] = useState<DiningCompanion[]>([]);
   const [payerId, setPayerId] = useState<string | null>(null);
@@ -277,11 +230,6 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setBill(recalculateBill(newBill));
-    setAssignments({});
-  }, []);
-
-  const resetToDemoBill = useCallback(() => {
-    setBill(recalculateBill(DEMO_BILL));
     setAssignments({});
   }, []);
 
@@ -432,24 +380,15 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const markAllPaid = useCallback((paid = true) => {
     setPaidStatus(() => {
       const next: Record<string, boolean> = {};
+      const effectivePayerId = payerId || people.find((p) => p.isOrganizer)?.id || people[0]?.id;
       people.forEach((p) => {
-        next[p.id] = paid;
+        if (p.id !== effectivePayerId) {
+          next[p.id] = paid;
+        }
       });
       return next;
     });
-  }, [people]);
-
-  const payer = useMemo((): DiningCompanion | null => {
-    if (payerId) {
-      const found = people.find((p) => p.id === payerId);
-      if (found) return found;
-    }
-    return people.find((p) => p.isOrganizer) || people[0] || null;
   }, [people, payerId]);
-
-  const organizer = useMemo((): DiningCompanion | null => {
-    return people.find((p) => p.isOrganizer) || people[0] || null;
-  }, [people]);
 
   // Assignment Progress & Totals
   const assignedItemsCount = useMemo(() => {
@@ -537,7 +476,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const diff = Math.round((bill.grandTotal - sumTotal) * 100) / 100;
 
       if (Math.abs(diff) > 0 && Math.abs(diff) < 0.10) {
-        // Adjust the person with the largest share (or first person) to reconcile exact total
+        // Adjust the person with the largest share to reconcile exact total
         let maxIndex = 0;
         let maxShare = -1;
         rawSummaries.forEach((s, idx) => {
@@ -556,38 +495,77 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return rawSummaries;
   }, [people, bill.items, bill.subtotal, bill.tax, bill.serviceCharge, bill.grandTotal, assignments, isAllItemsAssigned]);
 
-  // Settlement totals
+  const payer = useMemo((): DiningCompanion | null => {
+    if (payerId) {
+      const found = people.find((p) => p.id === payerId);
+      if (found) return found;
+    }
+    return people.find((p) => p.isOrganizer) || people[0] || null;
+  }, [people, payerId]);
+
+  const organizer = useMemo((): DiningCompanion | null => {
+    return people.find((p) => p.isOrganizer) || people[0] || null;
+  }, [people]);
+
+  // Effective payer ID
+  const effectivePayerId = payer?.id || payerId;
+
+  // Non-payer companions who owe repayment to the payer
+  const nonPayerPeople = useMemo(() => {
+    return effectivePayerId ? people.filter((p) => p.id !== effectivePayerId) : people;
+  }, [people, effectivePayerId]);
+
+  const nonPayerShares = useMemo(() => {
+    return effectivePayerId ? personShares.filter((s) => s.person.id !== effectivePayerId) : personShares;
+  }, [personShares, effectivePayerId]);
+
+  const payerShare = useMemo(() => {
+    return personShares.find((s) => s.person.id === effectivePayerId) || null;
+  }, [personShares, effectivePayerId]);
+
+  const payerShareAmount = payerShare ? payerShare.totalShare : 0;
+
+  const companionsToSettleCount = nonPayerPeople.length;
+
+  // Settlement totals (tracking repayments from companions to the payer)
   const paidMembersCount = useMemo(() => {
-    return people.filter((p) => !!paidStatus[p.id]).length;
-  }, [people, paidStatus]);
+    return nonPayerPeople.filter((p) => !!paidStatus[p.id]).length;
+  }, [nonPayerPeople, paidStatus]);
 
   const pendingMembersCount = useMemo(() => {
-    return people.length - paidMembersCount;
-  }, [people.length, paidMembersCount]);
+    return companionsToSettleCount - paidMembersCount;
+  }, [companionsToSettleCount, paidMembersCount]);
 
   const totalPaidAmount = useMemo(() => {
     return Math.round(
-      personShares.reduce((sum, s) => (paidStatus[s.person.id] ? sum + s.totalShare : sum), 0) * 100
+      nonPayerShares.reduce((sum, s) => (paidStatus[s.person.id] ? sum + s.totalShare : sum), 0) * 100
     ) / 100;
-  }, [personShares, paidStatus]);
+  }, [nonPayerShares, paidStatus]);
 
   const totalPendingAmount = useMemo(() => {
     return Math.round(
-      personShares.reduce((sum, s) => (!paidStatus[s.person.id] ? sum + s.totalShare : sum), 0) * 100
+      nonPayerShares.reduce((sum, s) => (!paidStatus[s.person.id] ? sum + s.totalShare : sum), 0) * 100
     ) / 100;
-  }, [personShares, paidStatus]);
+  }, [nonPayerShares, paidStatus]);
+
+  const totalToCollectAmount = useMemo(() => {
+    return Math.round(
+      nonPayerShares.reduce((sum, s) => sum + s.totalShare, 0) * 100
+    ) / 100;
+  }, [nonPayerShares]);
 
   const isAllMembersPaid = useMemo(() => {
-    return people.length > 0 && paidMembersCount === people.length;
-  }, [people.length, paidMembersCount]);
+    return companionsToSettleCount > 0 ? paidMembersCount === companionsToSettleCount : true;
+  }, [companionsToSettleCount, paidMembersCount]);
 
   const resetAll = useCallback(() => {
-    resetToDemoBill();
+    setBill(EMPTY_BILL);
     setPeople([]);
     setPayerId(null);
     setUpiId(null);
+    setAssignments({});
     setPaidStatus({});
-  }, [resetToDemoBill]);
+  }, []);
 
   return (
     <BillContext.Provider
@@ -600,7 +578,6 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTaxRate,
         setServiceChargeRate,
         setBillFromOCR,
-        resetToDemoBill,
         isTotalsMatching,
         totalsDiff,
         people,
@@ -628,8 +605,11 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
         markAllPaid,
         paidMembersCount,
         pendingMembersCount,
+        companionsToSettleCount,
         totalPaidAmount,
         totalPendingAmount,
+        totalToCollectAmount,
+        payerShareAmount,
         isAllMembersPaid,
         payer,
         organizer,
