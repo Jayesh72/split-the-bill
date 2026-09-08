@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bill, DiningCompanion } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
+import { useBill } from '@/context/BillContext';
 
 interface SettlementHeaderCardProps {
   bill: Bill;
@@ -19,6 +20,7 @@ export const SettlementHeaderCard: React.FC<SettlementHeaderCardProps> = ({
   companionCount,
 }) => {
   const navigate = useNavigate();
+  const { upiId: billPayerUpiId } = useBill();
 
   return (
     <div className="bg-white rounded-3xl p-6 sm:p-7 shadow-[0_4px_20px_-4px_rgba(15,23,42,0.06)] border border-charcoal-200/90 relative overflow-hidden transition-all duration-300">
@@ -63,13 +65,21 @@ export const SettlementHeaderCard: React.FC<SettlementHeaderCardProps> = ({
               )}
             </div>
 
-            {/* Payer & Organizer pills */}
+            {/* Payer & Organizer & UPI pills */}
             <div className="flex flex-wrap items-center gap-2 mt-3">
               {payer && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 border border-amber-200/80 text-xs font-semibold text-amber-800">
                   <UserCheck className="w-3.5 h-3.5 text-amber-600" />
                   <span>
                     Bill Paid by: <strong className="font-bold text-amber-900">{payer.name}</strong>
+                  </span>
+                </div>
+              )}
+
+              {payer && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-teal-50 border border-teal-200/80 text-xs font-semibold text-teal-800">
+                  <span className="font-mono text-[11px] font-bold">
+                    UPI: {billPayerUpiId || 'Not configured'}
                   </span>
                 </div>
               )}

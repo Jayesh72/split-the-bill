@@ -40,7 +40,7 @@ export const ShareSplitPage: React.FC = () => {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // Trigger print
-  const handlePrintPdf = () => {
+  const handlePrintReceipt = () => {
     window.print();
   };
 
@@ -204,7 +204,7 @@ export const ShareSplitPage: React.FC = () => {
                   bill={bill}
                   personShares={personShares}
                   payer={payer}
-                  onPrintPdf={handlePrintPdf}
+                  onPrintReceipt={handlePrintReceipt}
                 />
               </div>
 
@@ -246,7 +246,7 @@ export const ShareSplitPage: React.FC = () => {
 
             {/* Bottom Actions Bar */}
             <ShareActions
-              onPrintPdf={handlePrintPdf}
+              onPrintReceipt={handlePrintReceipt}
               onResetNewBill={() => setIsResetConfirmOpen(true)}
             />
           </div>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navbar } from '@/components/landing/Navbar';
 import { Hero } from '@/components/landing/Hero';
-import { ReceiptPreviewCard } from '@/components/landing/ReceiptPreviewCard';
 import { WorkflowSection } from '@/components/landing/WorkflowSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
 import { CtaSection } from '@/components/landing/CtaSection';
@@ -14,7 +13,6 @@ export const LandingPage: React.FC = () => {
         <Navbar />
         <main>
           <Hero />
-          <ReceiptPreviewCard />
           <WorkflowSection />
           <FeaturesSection />
           <CtaSection />

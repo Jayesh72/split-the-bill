@@ -58,7 +58,8 @@ backend/
 │   ├── __init__.py
 │   ├── test_health.py         # Health check tests
 │   ├── test_schemas.py        # Pydantic schema validation tests
-│   └── test_ocr_route.py      # OCR extraction route tests
+│   ├── test_ocr_route.py      # OCR extraction route tests
+│   └── test_upi.py            # UPI URI generator & validation contract tests
 ├── requirements.txt           # Python package dependencies
 ├── .env.example               # Environment variables template
 ├── .gitignore                 # Python and environment ignore rules

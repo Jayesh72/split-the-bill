@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Share2, MessageSquare, Copy, CheckCheck, FileDown, Sparkles } from 'lucide-react';
+import { Share2, MessageSquare, Copy, CheckCheck, Printer, Sparkles } from 'lucide-react';
 import { Bill, PersonShareSummary, DiningCompanion } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -8,14 +8,14 @@ interface GroupSharingCardProps {
   bill: Bill;
   personShares: PersonShareSummary[];
   payer: DiningCompanion | null;
-  onPrintPdf: () => void;
+  onPrintReceipt: () => void;
 }
 
 export const GroupSharingCard: React.FC<GroupSharingCardProps> = ({
   bill,
   personShares,
   payer,
-  onPrintPdf,
+  onPrintReceipt,
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
@@ -80,7 +80,7 @@ export const GroupSharingCard: React.FC<GroupSharingCardProps> = ({
             </span>
           </div>
           <p className="text-xs text-charcoal-500 mt-0.5 font-medium">
-            Broadcast everyone's breakdown via WhatsApp, copy a direct link, or print receipt PDF.
+            Broadcast everyone's breakdown via WhatsApp, copy a direct link, or print a receipt summary.
           </p>
         </div>
       </div>
@@ -118,15 +118,15 @@ export const GroupSharingCard: React.FC<GroupSharingCardProps> = ({
           )}
         </Button>
 
-        {/* Download / Print PDF */}
+        {/* Print Receipt Summary */}
         <Button
           variant="outline"
           size="md"
-          onClick={onPrintPdf}
+          onClick={onPrintReceipt}
           className="w-full text-charcoal-800 bg-charcoal-50 hover:bg-charcoal-100 border-charcoal-200 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
         >
-          <FileDown className="w-4 h-4 text-charcoal-500" />
-          <span>Download PDF</span>
+          <Printer className="w-4 h-4 text-charcoal-500" />
+          <span>Print Receipt</span>
         </Button>
 
         {/* Copy Text Summary */}

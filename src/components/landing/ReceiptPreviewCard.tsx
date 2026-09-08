@@ -1,23 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Info,
   Check,
-  Share2,
-  Copy,
-  CheckCheck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { LogoIcon } from '@/components/ui/LogoIcon';
 
 export const ReceiptPreviewCard: React.FC = () => {
-  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
-
-  const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const receiptItems = [
     {
@@ -255,35 +246,6 @@ export const ReceiptPreviewCard: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Pre-built WhatsApp & UPI Link bar */}
-            <div className="mt-4 p-3 rounded-2xl bg-[#F8FAFC] border border-charcoal-200/90 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[#E6F4EA] text-[#0D766E] flex items-center justify-center">
-                  <Share2 className="w-3.5 h-3.5 text-[#0D766E]" />
-                </div>
-                <span className="text-xs font-semibold text-charcoal-800">
-                  Pre-built WhatsApp & UPI Link
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-charcoal-50 border border-charcoal-200 text-xs font-semibold text-charcoal-800 shadow-sm transition-all cursor-pointer"
-              >
-                {copied ? (
-                  <>
-                    <CheckCheck className="w-3 h-3 text-emerald-600" />
-                    <span className="text-emerald-600">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3 text-charcoal-500" />
-                    <span>Copy Link</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>

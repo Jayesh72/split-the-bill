@@ -1,6 +1,6 @@
 # Split the Bill
 
-**Split the Bill** is a modern, privacy-first web application designed to simplify restaurant and dining expense splitting. It eliminates tedious manual math and awkward bill calculations by letting users upload or photograph restaurant receipts, extract itemized dishes, taxes, and service charges via a high-performance **Python FastAPI** backend powered by **Google Gemini Multimodal Vision API**, add custom dining companions, assign individual and shared dishes to diners, and generate instant, mathematically balanced settlement breakdowns with dynamic UPI payment QR codes, WhatsApp share requests, and printable PDF receipts.
+**Split the Bill** is a modern, privacy-first web application designed to simplify restaurant and dining expense splitting. It eliminates tedious manual math and awkward bill calculations by letting users upload or photograph restaurant receipts, extract itemized dishes, taxes, and service charges via a high-performance **Python FastAPI** backend powered by **Google Gemini Multimodal Vision API**, add custom dining companions, assign individual and shared dishes to diners, and generate instant, mathematically balanced settlement breakdowns with dynamic UPI payment QR codes, WhatsApp share requests, and print-friendly receipt summaries.
 
 ---
 
@@ -163,15 +163,18 @@ Landing Page (/)
   * Proportional GST/Tax and Service Charge breakdown rows.
   * Reconciled total calculation ensuring $\sum (\text{member totals}) \equiv \text{bill.grandTotal}$ down to the exact paise.
 * **Instant UPI Payments & QR Code Modal**:
-  * Generates standard UPI payment intent URIs: `upi://pay?pa=<payerUpiId>&pn=<payerName>&am=<amount>&cu=INR&tn=Split bill for <restaurant>`.
-  * Custom dynamic QR code generated in real time using `qrcode` for each member's exact calculated amount.
-  * One-click "Open UPI App" button for mobile devices (Google Pay, PhonePe, Paytm, etc.).
-  * One-click copy buttons for UPI ID and payment URI with visual feedback.
+  * Split the Bill can generate UPI payment intents and QR codes using the payer's UPI ID and each diner's calculated amount. Payments are completed in the user's UPI application; the application does not directly process or verify payments.
+  * Validates standard UPI VPA syntax (`username@provider`) without asserting bank ownership.
+  * If no UPI ID is entered, the modal prompts the organizer to enter their real UPI ID without leaving the settlement flow.
+  * Generates standard NPCI UPI payment intent URIs: `upi://pay?pa=<payerUpiId>&pn=<payerName>&am=<amount>&cu=INR&tn=Split bill for <restaurant>`.
+  * Dynamic QR code generated in real-time using `qrcode` for each member's exact calculated settlement amount.
+  * Generic "Pay Now" UPI deep link on mobile devices and one-click copy actions for the UPI link and UPI ID.
+  * Clear payment verification disclaimer distinguishing QR generation from payment completion; "Mark as Paid" is strictly local/manual.
 * **WhatsApp Sharing**:
   * **Individual Share**: Generates personalized payment requests (*"Hey Rahul! Your share for The Olive Table is ₹490.00. You had: Paneer Tikka and Coke. Please settle up with Priya via UPI."*).
   * **Group Bill Share**: Generates a full markdown/plain-text breakdown of the entire table's split.
-* **Export & Print PDF**:
-  * 1-Click "Download PDF / Print" generates an authentic monospace restaurant split receipt (`@media print`) optimized for browser printing and PDF export.
+* **Print-Friendly Receipt Summary**:
+  * 1-Click "Print Receipt" triggers the browser print dialog with an authentic monospace restaurant split receipt (`@media print`) formatted for physical receipts or save-as-PDF via browser.
 * **Navigation & Guard Safety**:
   * `← Back to Assign Items` preserves all assignments and state.
   * "Start New Bill Split" resets state with a confirmation modal.
@@ -179,17 +182,23 @@ Landing Page (/)
 
 ---
 
-## Application Flow & Dynamic Progress Stepper
+## State Persistence & Lifecycle
 
-The horizontal `BillProgressStepper` component dynamically derives its active state from the current route across all pages:
+* **Session Scope**: Bill splitting state is maintained in React Context during the active session.
+* **Route Navigation**: Navigating between steps (`/split` $\leftrightarrow$ `/review` $\leftrightarrow$ `/add-people` $\leftrightarrow$ `/assign` $\leftrightarrow$ `/share`) preserves all bill items, dining companions, assignments, and calculated shares.
+* **Browser Refresh**: A full browser refresh resets in-memory state because persistent storage/database has intentionally not been implemented for this lightweight, privacy-first tool.
+* **Safety Guards**: Directly opening later steps without required prior state renders friendly guard cards with direct navigation buttons back to the prerequisite step.
 
-| Step # | Step Name | Route | Active Stepper State | Description |
-|---|---|---|---|---|
-| **Step 1** | **Upload Bill** | `/split` | Step 1 Active (Steps 2–5 Upcoming) | Upload receipt, drag-and-drop, rate limit, FastAPI & Gemini Vision OCR |
-| **Step 2** | **Review OCR** | `/review` | Step 2 Active (Step 1 Done, 3–5 Upcoming) | Edit line items, quantities, prices, taxes & service charges |
-| **Step 3** | **Add People** | `/add-people` | Step 3 Active (Steps 1–2 Done, 4–5 Upcoming) | Create dining group, select avatar colors, designate payer |
-| **Step 4** | **Assign Items** | `/assign` | Step 4 Active (Steps 1–3 Done, Step 5 Upcoming) | Assign solo/shared dishes, live member subtotals & gating |
-| **Step 5** | **Share Split** | `/share` | Step 5 Active (Steps 1–4 Completed) | Final settlement, UPI QR, WhatsApp share & PDF receipt |
+---
+
+## Technical Security & Hardening Architecture
+
+1. **Server-Side AI Secrets**: The `GEMINI_API_KEY` is exclusively managed on the Python backend (`backend/.env`). No AI SDK or secrets are loaded into the browser bundle.
+2. **Binary Image Inspection**: Uploaded receipt files are inspected using Pillow (`PIL.Image.verify()`) to reject corrupted files, renamed executables, and spoofed MIME types.
+3. **Prompt Injection Defense-in-Depth**: Strict instruction hierarchy instructs the AI model to treat all image text strictly as untrusted raw data and ignore embedded instructions or commands.
+4. **In-Memory Rate Limiting**: Sliding-window rate limiter prevents abuse (designed for single backend instances / local development).
+5. **Stable RFC4122 UUIDs**: All dining companion and dish identifiers are generated via standard UUID v4 (`crypto.randomUUID()`).
+6. **Non-Custodial UPI Handling**: Real user-entered UPI IDs only (never derived from names or faked); payment intents and dynamic QR codes are generated client-side for standard UPI applications.
 
 ---
 
@@ -199,72 +208,19 @@ The horizontal `BillProgressStepper` component dynamically derives its active st
 * **Framework**: [React 18.3.1](https://react.dev/)
 * **Language**: [TypeScript 5.7.3](https://www.typescriptlang.org/)
 * **Build Tool**: [Vite 6.2.0](https://vitejs.dev/)
-* **Routing**: [React Router DOM 7.18.3](https://reactrouter.com/)
-* **Styling**: [Tailwind CSS 3.4.17](https://tailwindcss.com/) with PostCSS & Autoprefixer
+* **Styling**: [Tailwind CSS 3.4.17](https://tailwindcss.com/)
+* **Routing**: [React Router 7.18.3](https://reactrouter.com/)
 * **Icons**: [Lucide React 0.475.0](https://lucide.dev/)
-* **QR Code Generator**: [qrcode 1.5.4](https://www.npmjs.com/package/qrcode) & `@types/qrcode 1.5.6`
-* **Styling Utilities**: `clsx 2.1.1` & `tailwind-merge 2.6.0`
-* **Code Quality**: [ESLint 9.21.0](https://eslint.org/) & [Prettier 3.5.2](https://prettier.io/)
+* **QR Generation**: [QRCode 1.5.4](https://www.npmjs.com/package/qrcode)
 
 ### Backend
-* **Language**: [Python 3.11+](https://www.python.org/)
-* **Web Framework**: [FastAPI 0.115+](https://fastapi.tiangolo.com/)
+* **Framework**: [FastAPI 0.115+](https://fastapi.tiangolo.com/)
 * **ASGI Server**: [Uvicorn 0.34+](https://www.uvicorn.org/)
-* **Data Validation & Settings**: [Pydantic v2](https://docs.pydantic.dev/) & [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
-* **AI / OCR Engine**: [Google Generative AI SDK](https://github.com/google/generative-ai-python) (Google Gemini 2.5 Flash / 1.5 Flash Vision) & OpenAI Python SDK
-* **Multipart File Handling**: [python-multipart](https://github.com/andrew-d/python-multipart)
-* **Environment Management**: [python-dotenv](https://github.com/theskumar/python-dotenv)
-* **Testing**: [Pytest](https://docs.pytest.org/) & [HTTPX](https://www.python-httpx.org/)
-
----
-
-## Backend API Endpoints & Documentation
-
-The FastAPI backend automatically generates interactive Swagger and ReDoc documentation:
-
-* **Interactive Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Alternative ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
-
-### Endpoints Overview
-
-| Method | Endpoint | Description | Request Body / Params |
-|---|---|---|---|
-| `GET` | `/` | API Root & Status overview | None |
-| `GET` | `/api/health` | Service health verification | None |
-| `POST` | `/api/ocr/extract` | Multimodal receipt OCR extraction | `multipart/form-data` (`file: UploadFile`) |
-
----
-
-## Data Models & Contracts
-
-### Backend Pydantic Schemas (`backend/app/schemas/ocr.py`)
-
-```python
-class ExtractedReceiptItem(BaseModel):
-    name: str = Field(..., description="Exact dish or beverage name")
-    qty: int = Field(default=1, ge=1, description="Quantity ordered")
-    price: float = Field(..., ge=0.0, description="Total line price")
-    isShared: Optional[bool] = Field(default=False, description="Shared status")
-
-class ExtractedReceiptData(BaseModel):
-    restaurantName: str = Field(default="Restaurant Receipt")
-    location: Optional[str] = Field(default="")
-    billNumber: Optional[str] = Field(default="")
-    currency: Optional[str] = Field(default="₹")
-    items: List[ExtractedReceiptItem] = Field(default_factory=list)
-    subtotal: float = Field(default=0.0, ge=0.0)
-    gst: Optional[float] = Field(default=0.0, ge=0.0)
-    gstRate: Optional[float] = Field(default=5.0, ge=0.0)
-    serviceCharge: Optional[float] = Field(default=0.0, ge=0.0)
-    serviceChargeRate: Optional[float] = Field(default=10.0, ge=0.0)
-    grandTotal: float = Field(default=0.0, ge=0.0)
-
-class OCRResponse(BaseModel):
-    success: bool = True
-    data: Optional[ExtractedReceiptData] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
-```
+* **Language**: Python 3.11+
+* **Data Validation**: [Pydantic v2](https://docs.pydantic.dev/)
+* **Image Processing**: [Pillow 10.0+](https://python-pillow.org/)
+* **AI Engine**: [Google GenAI Python SDK](https://github.com/googleapis/python-genai) (`google-genai`) & OpenAI Python SDK
+* **Testing**: [Pytest 8.3+](https://docs.pytest.org/) & [HTTPX](https://www.python-httpx.org/)
 
 ---
 
@@ -282,7 +238,7 @@ split-bill/
 │   │   │   └── ocr.py              # Pydantic models (ExtractedReceiptData, OCRResponse)
 │   │   ├── services/
 │   │   │   ├── __init__.py
-│   │   │   ├── gemini_service.py   # Google Gemini Vision OCR extraction service (Primary)
+│   │   │   ├── gemini_service.py   # Google GenAI SDK Vision OCR extraction service
 │   │   │   └── openai_service.py   # Async OpenAI Vision OCR service (Alternative)
 │   │   ├── routes/
 │   │   │   ├── __init__.py
@@ -295,12 +251,16 @@ split-bill/
 │   │   ├── __init__.py
 │   │   ├── test_health.py          # Health check endpoint tests
 │   │   ├── test_schemas.py         # Pydantic schema validation tests
-│   │   └── test_ocr_route.py       # OCR extraction route integration tests
-│   ├── requirements.txt            # Python dependencies (FastAPI, Uvicorn, Gemini, OpenAI, etc.)
+│   │   ├── test_ocr_route.py       # OCR extraction route integration tests
+│   │   ├── test_upload_validation.py # Binary image inspection & spoofing tests
+│   │   ├── test_rate_limiter.py    # Rate limiter middleware tests
+│   │   ├── test_business_logic.py  # Settlement math & exact reconciliation tests
+│   │   └── test_upi.py             # UPI URI generator & format validation tests
+│   ├── requirements.txt            # Python dependencies (FastAPI, Uvicorn, google-genai, Pillow)
 │   ├── .env.example                # Backend environment variables template (GEMINI_API_KEY)
 │   ├── .gitignore                  # Python-specific git ignore rules
 │   └── README.md                   # Backend architecture and setup documentation
-├── .env.example                    # Frontend environment variables template
+├── .env.example                    # Frontend environment variables template (VITE_API_BASE_URL)
 ├── .gitignore                      # Root git ignore rules (includes backend/.env)
 ├── package.json                    # Frontend dependencies and npm scripts
 ├── package-lock.json               # Locked frontend dependency tree
@@ -320,10 +280,11 @@ split-bill/
     │   └── BillContext.tsx         # Unified state provider & arithmetic calculation engine
     ├── lib/
     │   ├── api.ts                  # Backend REST API client (extractReceiptFromBackend, checkBackendHealth)
-    │   └── utils.ts                # Formatting utilities (cn, formatCurrency, getInitials)
+    │   ├── upi.ts                  # UPI format validation & URI intent generator
+    │   └── utils.ts                # Formatting utilities (cn, formatCurrency, getInitials, generateUUID)
     ├── components/
     │   ├── ui/                     # Reusable design system primitives (Badge, Button, Card, LogoIcon)
-    │   ├── landing/                # Landing page sections (Hero, ReceiptPreviewCard, Workflow, Features, CTA, Footer)
+    │   ├── landing/                # Landing page sections (Hero, WorkflowSection, FeaturesSection, CtaSection, Footer)
     │   ├── split/                  # Step 1 Upload components (Dropzone, OCRScannerCard, Stepper)
     │   ├── review/                 # Step 2 Review components (ReceiptInfoCard, ExtractedItemsTable, BillSummary)
     │   ├── people/                 # Step 3 People components (AddPersonForm, PersonCard, PayerSelectorCard)
@@ -391,7 +352,7 @@ The frontend will be running at [http://localhost:5173](http://localhost:5173).
 ### Run Backend Tests (Pytest)
 ```bash
 cd backend
-.venv\Scripts\pytest backend/tests
+.venv\Scripts\pytest tests
 ```
 
 ### Run Frontend Typecheck & Build

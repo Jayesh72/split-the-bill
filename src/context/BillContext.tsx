@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import { Bill, BillItem, DiningCompanion, AvatarColorOption, PersonShareSummary, ExtractedReceiptData } from '@/types';
+import { generateUUID } from '@/lib/utils';
 
 export const AVATAR_COLOR_PALETTE: AvatarColorOption[] = [
   { name: 'Teal', value: '#0D766E', bgClass: 'bg-[#0D766E]', borderClass: 'border-[#0D766E]', textClass: 'text-white' },
@@ -37,6 +38,8 @@ interface BillContextType {
   // Payer (Who settled the receipt)
   payerId: string | null;
   setPayerId: (id: string | null) => void;
+  upiId: string | null;
+  setUpiId: (id: string | null) => void;
 
   // Step 4: Item Assignments (itemId -> personId[])
   assignments: Record<string | number, string[]>;
@@ -160,6 +163,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clean empty people state - NO hardcoded default people
   const [people, setPeople] = useState<DiningCompanion[]>([]);
   const [payerId, setPayerId] = useState<string | null>(null);
+  const [upiId, setUpiId] = useState<string | null>(null);
   // Assignments state: itemId -> personId[]
   const [assignments, setAssignments] = useState<Record<string | number, string[]>>({});
 
@@ -194,7 +198,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const addItem = useCallback((name = 'New Dish', qty = 1, unitPrice = 100.0) => {
     setBill((prevBill) => {
       const newItem: BillItem = {
-        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        id: generateUUID(),
         name,
         qty,
         unitPrice,
@@ -237,7 +241,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const qty = item.qty || 1;
       const unitPrice = qty > 1 ? item.price / qty : item.price;
       return {
-        id: `ocr-${idx + 1}`,
+        id: generateUUID(),
         name: item.name || `Item ${idx + 1}`,
         qty,
         unitPrice: Math.round(unitPrice * 100) / 100,
@@ -251,7 +255,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const receiptTotal = data.grandTotal || data.subtotal || 0;
 
     const newBill: Bill = {
-      id: `bill-${Date.now()}`,
+      id: generateUUID(),
       restaurantName: data.restaurantName || 'Restaurant Receipt',
       address: data.location || 'Local Restaurant',
       dateTime: new Date().toLocaleDateString('en-US', {
@@ -303,7 +307,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isFirst = prev.length === 0;
 
       const newPerson: DiningCompanion = {
-        id: `person-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        id: generateUUID(),
         name: trimmed,
         avatarColor: assignedColor,
         isOrganizer: isFirst ? true : isOrganizer,
@@ -581,6 +585,7 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetToDemoBill();
     setPeople([]);
     setPayerId(null);
+    setUpiId(null);
     setPaidStatus({});
   }, [resetToDemoBill]);
 
@@ -606,6 +611,8 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setOrganizer,
         payerId,
         setPayerId,
+        upiId,
+        setUpiId,
         assignments,
         assignItem,
         togglePersonOnItem,

@@ -1,12 +1,15 @@
 import React from 'react';
-import { CreditCard, Check, Crown, AlertCircle } from 'lucide-react';
+import { CreditCard, Check, Crown, AlertCircle, QrCode, CheckCircle2 } from 'lucide-react';
 import { useBill } from '@/context/BillContext';
 import { getInitials } from '@/lib/utils';
+import { isValidUpiId } from '@/lib/upi';
 
 export const PayerSelectorCard: React.FC = () => {
-  const { people, payerId, setPayerId } = useBill();
+  const { people, payerId, setPayerId, upiId, setUpiId } = useBill();
 
   const selectedPayer = people.find((p) => p.id === payerId);
+  const hasUpiInput = !!(upiId && upiId.trim().length > 0);
+  const isUpiValid = isValidUpiId(upiId);
 
   return (
     <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_10px_30px_-4px_rgba(15,23,42,0.06),0_4px_12px_-2px_rgba(15,23,42,0.03)] border border-charcoal-200/90 flex flex-col gap-4">
@@ -36,7 +39,7 @@ export const PayerSelectorCard: React.FC = () => {
           <span>Add at least one dining companion first to designate the payer.</span>
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-3">
           <label htmlFor="payer-select" className="text-[10px] font-bold text-charcoal-500 uppercase tracking-wider block">
             Select Bill Payer
           </label>
@@ -67,7 +70,7 @@ export const PayerSelectorCard: React.FC = () => {
 
           {/* Highlight Selected Payer Card */}
           {selectedPayer ? (
-            <div className="p-3 rounded-2xl bg-[#E6F4EA]/60 border border-[#A7F3D0] flex items-center justify-between gap-3 mt-1">
+            <div className="p-3 rounded-2xl bg-[#E6F4EA]/60 border border-[#A7F3D0] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white shadow-sm flex-shrink-0"
@@ -107,8 +110,48 @@ export const PayerSelectorCard: React.FC = () => {
               Please select who paid the restaurant bill before continuing.
             </p>
           )}
+
+          {/* Real UPI ID Input Field */}
+          {selectedPayer && (
+            <div className="pt-2 border-t border-charcoal-100 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="payer-upi-id" className="text-[10px] font-bold text-charcoal-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5 text-[#0D766E]" />
+                  <span>Payer UPI ID (For Instant QR Settlement)</span>
+                </label>
+                {hasUpiInput && isUpiValid && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3" /> Valid Format
+                  </span>
+                )}
+                {hasUpiInput && !isUpiValid && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                    <AlertCircle className="w-3 h-3" /> Invalid Format
+                  </span>
+                )}
+              </div>
+
+              <input
+                id="payer-upi-id"
+                type="text"
+                value={upiId || ''}
+                onChange={(e) => setUpiId(e.target.value.trim() ? e.target.value.trim() : null)}
+                placeholder="e.g. rahul@okaxis or name@oksbi"
+                className={`w-full px-4 py-2.5 bg-[#F8FAFC] hover:bg-white focus:bg-white border rounded-2xl text-xs sm:text-sm font-mono text-charcoal-900 focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                  hasUpiInput && !isUpiValid
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+                    : 'border-charcoal-200 hover:border-charcoal-300 focus:border-[#0D766E] focus:ring-[#0D766E]/20'
+                }`}
+              />
+
+              <p className="text-[11px] text-charcoal-500 font-medium">
+                Enter your actual UPI ID. We don't verify ownership of the ID.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
+

@@ -1,15 +1,15 @@
 import React from 'react';
-import { ArrowLeft, FileDown, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Printer, PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 
 interface ShareActionsProps {
-  onPrintPdf: () => void;
+  onPrintReceipt: () => void;
   onResetNewBill: () => void;
 }
 
 export const ShareActions: React.FC<ShareActionsProps> = ({
-  onPrintPdf,
+  onPrintReceipt,
   onResetNewBill,
 }) => {
   const navigate = useNavigate();
@@ -32,11 +32,11 @@ export const ShareActions: React.FC<ShareActionsProps> = ({
         <Button
           variant="outline"
           size="lg"
-          onClick={onPrintPdf}
+          onClick={onPrintReceipt}
           className="w-full sm:w-auto text-xs font-bold text-charcoal-800 bg-white hover:bg-charcoal-50 border-charcoal-200/90 shadow-sm cursor-pointer"
         >
-          <FileDown className="w-4 h-4 mr-1.5 text-charcoal-500" />
-          <span>Download PDF / Print</span>
+          <Printer className="w-4 h-4 mr-1.5 text-charcoal-500" />
+          <span>Print Receipt</span>
         </Button>
 
         <Button
