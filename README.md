@@ -1,6 +1,35 @@
 # Split the Bill
 
-**Split the Bill** is a modern, privacy-first web application designed to simplify restaurant and dining expense splitting. It eliminates tedious manual math and awkward bill calculations by letting users upload or photograph restaurant receipts, extract itemized dishes, taxes, and service charges via AI OCR, add custom dining companions, assign individual and shared dishes to diners, and generate instant, mathematically balanced settlement breakdowns with dynamic UPI payment QR codes, WhatsApp share requests, and printable PDF receipts.
+**Split the Bill** is a modern, privacy-first web application designed to simplify restaurant and dining expense splitting. It eliminates tedious manual math and awkward bill calculations by letting users upload or photograph restaurant receipts, extract itemized dishes, taxes, and service charges via a high-performance **Python FastAPI** backend powered by **Google Gemini Multimodal Vision API**, add custom dining companions, assign individual and shared dishes to diners, and generate instant, mathematically balanced settlement breakdowns with dynamic UPI payment QR codes, WhatsApp share requests, and printable PDF receipts.
+
+---
+
+## Architecture Overview
+
+The system follows a clean, decoupled client-server architecture:
+
+```text
+React Frontend (Vite • TypeScript • Tailwind CSS)
+      │
+      │  1. Multipart Upload (POST /api/ocr/extract)
+      ▼
+Python FastAPI Backend (Uvicorn • Python 3.11+)
+      │
+      │  2. CORS Allowlist & In-Memory Rate Limiting
+      │  3. Multimodal Analysis (Google Gemini Vision • gemini-2.5-flash)
+      ▼
+Google Gemini API (Encrypted Server-Side Request)
+      │
+      │  4. Structured Receipt Extraction (JSON Schema Mode)
+      ▼
+Pydantic Data Contract Validation (ExtractedReceiptData)
+      │
+      │  5. Validated JSON Response Envelope
+      ▼
+React Frontend State (BillContext • Arithmetic Settlement Engine)
+```
+
+> **Security Guarantee**: The `GEMINI_API_KEY` is stored **exclusively** on the Python backend environment (`backend/.env`) and is never exposed to the frontend, browser, or Git repository. The frontend communicates with the backend via standard REST endpoints (`/api/ocr/extract`, `/api/health`).
 
 ---
 
@@ -31,19 +60,19 @@ Landing Page (/)
   * Direct clipboard paste (`Ctrl+V`) for instant screenshot processing.
 * **File Validation**:
   * Strict file type enforcement (`.png`, `.jpeg`, `.jpg`, `.webp`, `.heic`, `.pdf`, `.bmp`, `.tiff`).
-  * Enforces a maximum file size of **5MB per file**.
+  * Enforces a maximum file size of **5MB per file** (with backend supporting up to 10MB).
 * **Batch Upload Queue**:
   * Upload up to **5 images simultaneously** with individual file preview, individual removal, and batch clearing.
 * **Client-Side Rate Limiter**:
   * Sliding-window rate limiter (maximum 5 upload actions per minute with a 2-second cooldown and real-time countdown timer).
 * **Live AI OCR Scanner**:
   * Visual laser scanning animation on the uploaded receipt image.
-  * Multi-stage live extraction status indicators: *Image Uploaded* $\rightarrow$ *Analyzing with Gemini* $\rightarrow$ *Extracting dishes & prices* $\rightarrow$ *Calculating taxes* $\rightarrow$ *Completed*.
-  * Extracts restaurant name, location, receipt date/number, line items, quantities, prices, taxes, and grand totals using Google Gemini API.
+  * Multi-stage live extraction status indicators: *Image Uploaded* $\rightarrow$ *Analyzing with FastAPI & Gemini Vision* $\rightarrow$ *Extracting dishes & prices* $\rightarrow$ *Calculating taxes* $\rightarrow$ *Completed*.
+  * Communicates asynchronously with the FastAPI backend endpoint (`POST /api/ocr/extract`).
 * **Demo Bill Preset**:
-  * One-click "Try with Pre-filled Demo Bill" ("The Olive Table") for testing without an API key or receipt image.
+  * One-click "Try with Pre-filled Demo Bill" ("The Olive Table") for testing the entire flow without an API key or receipt image.
 * **Privacy Assurance**:
-  * Client-side in-memory processing guarantee banner (no receipt data or images stored on external servers).
+  * Client-side in-memory processing guarantee banner (no receipt data or images permanently stored on external servers).
 
 ---
 
@@ -51,7 +80,7 @@ Landing Page (/)
 * **Restaurant & Receipt Metadata Card**:
   * Displays extracted restaurant name, address, receipt date/time, and bill number.
 * **Interactive Line Items Table**:
-  * Dynamically renders every extracted dish and drink.
+  * Dynamically renders every extracted dish and drink from backend Pydantic validation.
   * Inline editable item names.
   * Interactive quantity controls (increment/decrement with minimum quantity of 1).
   * Inline editable unit prices with automatic line total recalculation ($\text{Quantity} \times \text{Unit Price}$).
@@ -156,7 +185,7 @@ The horizontal `BillProgressStepper` component dynamically derives its active st
 
 | Step # | Step Name | Route | Active Stepper State | Description |
 |---|---|---|---|---|
-| **Step 1** | **Upload Bill** | `/split` | Step 1 Active (Steps 2–5 Upcoming) | Upload receipt, drag-and-drop, rate limit, Gemini OCR |
+| **Step 1** | **Upload Bill** | `/split` | Step 1 Active (Steps 2–5 Upcoming) | Upload receipt, drag-and-drop, rate limit, FastAPI & Gemini Vision OCR |
 | **Step 2** | **Review OCR** | `/review` | Step 2 Active (Step 1 Done, 3–5 Upcoming) | Edit line items, quantities, prices, taxes & service charges |
 | **Step 3** | **Add People** | `/add-people` | Step 3 Active (Steps 1–2 Done, 4–5 Upcoming) | Create dining group, select avatar colors, designate payer |
 | **Step 4** | **Assign Items** | `/assign` | Step 4 Active (Steps 1–3 Done, Step 5 Upcoming) | Assign solo/shared dishes, live member subtotals & gating |
@@ -164,126 +193,78 @@ The horizontal `BillProgressStepper` component dynamically derives its active st
 
 ---
 
-## Dynamic State Management
-
-All application state is centrally managed using React Context via `BillContext` (`src/context/BillContext.tsx`) and consumed via the `useBill()` hook:
-
-```text
-BillProvider (Shared State)
- ├── bill: Bill                              # Restaurant metadata, line items, taxes, totals
- ├── people: DiningCompanion[]               # Diners with stable IDs, names, avatar colors, isOrganizer
- ├── payerId: string | null                  # ID of the companion who paid the restaurant bill
- ├── assignments: Record<string, string[]>   # Mapping of itemId -> personId[]
- ├── paidStatus: Record<string, boolean>     # Mapping of personId -> isPaid (local settlement tracking)
- ├── personShares: PersonShareSummary[]      # Derived per-diner calculations with rounding reconciliation
- └── helper methods:
-      ├── setBillFromOCR()                   # Populates bill from Gemini OCR payload
-      ├── updateItem() / addItem() / deleteItem()
-      ├── addPerson() / updatePerson() / removePerson() / setOrganizer() / setPayerId()
-      ├── assignItem() / togglePersonOnItem() / clearItemAssignment()
-      ├── togglePaidStatus() / markAllPaid()
-      └── resetAll()                         # Clears state for a new split
-```
-
-### State Consistency & ID Stability
-* All assignments and payer designations reference stable, immutable IDs (`person.id`, `item.id`).
-* Renaming a companion in Step 3 automatically updates their name across Step 4 and Step 5 without losing their item assignments.
-* Deleting a companion in Step 3 automatically removes their references from assigned dishes and cleans up payer designations.
-* Navigating backwards and forwards preserves all inputs and assignments.
-
----
-
-## AI OCR / Receipt Extraction Architecture
-
-Receipt parsing is implemented in `src/lib/gemini.ts` using the Google Generative AI SDK (`@google/generative-ai`):
-
-* **Multimodal Extraction**: Converts the uploaded image file to a base64 payload and sends it with a structured system prompt to Google Gemini.
-* **Model Fallback Cascade**: Evaluates candidate models sequentially (`gemini-2.5-flash`, `gemini-1.5-flash`, `gemini-flash-latest`, etc.) to guarantee high availability across API tiers.
-* **Strict JSON Schema**: Prompt instructs the model to return a clean JSON object containing restaurant name, location, bill number, currency symbol, itemized line items (name, quantity, price), subtotal, GST rate/amount, service charge rate/amount, and grand total.
-* **Sanitization & Error Handling**: Sanitizes string inputs, coerces numerical quantities and prices, handles missing subtotal/tax values, and provides user-friendly error messages if API keys are invalid.
-
----
-
-## Data Models
-
-The core TypeScript interfaces defined in `src/types/index.ts` are:
-
-```typescript
-// Extracted & Reviewed Bill Line Item
-export interface BillItem {
-  id: string | number;
-  name: string;
-  qty: number;
-  unitPrice: number;
-  totalPrice: number;
-  confidence?: number;
-  isShared?: boolean;
-  assignedTo?: string[];
-}
-
-// Complete Bill Structure
-export interface Bill {
-  id: string;
-  restaurantName: string;
-  address?: string;
-  dateTime?: string;
-  billNumber?: string;
-  currency: string;
-  items: BillItem[];
-  subtotal: number;
-  tax: number;
-  taxRate: number;
-  serviceCharge: number;
-  serviceChargeRate: number;
-  receiptTotal: number;
-  grandTotal: number;
-  receiptImagePreviewUrl?: string;
-}
-
-// Dining Companion (Group Member)
-export interface DiningCompanion {
-  id: string;
-  name: string;
-  avatarColor: string;
-  isOrganizer: boolean;
-}
-
-// Item Share Assigned to a Diner
-export interface AssignedItemShare {
-  item: BillItem;
-  itemTotal: number;
-  assignedCount: number;
-  shareAmount: number;
-  isShared: boolean;
-  coDinerNames: string[];
-}
-
-// Computed Individual Diner Breakdown & Settlement Share
-export interface PersonShareSummary {
-  person: DiningCompanion;
-  itemsCount: number;
-  subtotal: number;
-  taxShare: number;
-  serviceChargeShare: number;
-  totalShare: number;
-  items: AssignedItemShare[];
-}
-```
-
----
-
 ## Tech Stack
 
+### Frontend
 * **Framework**: [React 18.3.1](https://react.dev/)
 * **Language**: [TypeScript 5.7.3](https://www.typescriptlang.org/)
 * **Build Tool**: [Vite 6.2.0](https://vitejs.dev/)
 * **Routing**: [React Router DOM 7.18.3](https://reactrouter.com/)
 * **Styling**: [Tailwind CSS 3.4.17](https://tailwindcss.com/) with PostCSS & Autoprefixer
 * **Icons**: [Lucide React 0.475.0](https://lucide.dev/)
-* **AI / OCR SDK**: [@google/generative-ai 0.24.1](https://www.npmjs.com/package/@google/generative-ai) (Google Gemini API)
 * **QR Code Generator**: [qrcode 1.5.4](https://www.npmjs.com/package/qrcode) & `@types/qrcode 1.5.6`
 * **Styling Utilities**: `clsx 2.1.1` & `tailwind-merge 2.6.0`
 * **Code Quality**: [ESLint 9.21.0](https://eslint.org/) & [Prettier 3.5.2](https://prettier.io/)
+
+### Backend
+* **Language**: [Python 3.11+](https://www.python.org/)
+* **Web Framework**: [FastAPI 0.115+](https://fastapi.tiangolo.com/)
+* **ASGI Server**: [Uvicorn 0.34+](https://www.uvicorn.org/)
+* **Data Validation & Settings**: [Pydantic v2](https://docs.pydantic.dev/) & [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
+* **AI / OCR Engine**: [Google Generative AI SDK](https://github.com/google/generative-ai-python) (Google Gemini 2.5 Flash / 1.5 Flash Vision) & OpenAI Python SDK
+* **Multipart File Handling**: [python-multipart](https://github.com/andrew-d/python-multipart)
+* **Environment Management**: [python-dotenv](https://github.com/theskumar/python-dotenv)
+* **Testing**: [Pytest](https://docs.pytest.org/) & [HTTPX](https://www.python-httpx.org/)
+
+---
+
+## Backend API Endpoints & Documentation
+
+The FastAPI backend automatically generates interactive Swagger and ReDoc documentation:
+
+* **Interactive Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Alternative ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+### Endpoints Overview
+
+| Method | Endpoint | Description | Request Body / Params |
+|---|---|---|---|
+| `GET` | `/` | API Root & Status overview | None |
+| `GET` | `/api/health` | Service health verification | None |
+| `POST` | `/api/ocr/extract` | Multimodal receipt OCR extraction | `multipart/form-data` (`file: UploadFile`) |
+
+---
+
+## Data Models & Contracts
+
+### Backend Pydantic Schemas (`backend/app/schemas/ocr.py`)
+
+```python
+class ExtractedReceiptItem(BaseModel):
+    name: str = Field(..., description="Exact dish or beverage name")
+    qty: int = Field(default=1, ge=1, description="Quantity ordered")
+    price: float = Field(..., ge=0.0, description="Total line price")
+    isShared: Optional[bool] = Field(default=False, description="Shared status")
+
+class ExtractedReceiptData(BaseModel):
+    restaurantName: str = Field(default="Restaurant Receipt")
+    location: Optional[str] = Field(default="")
+    billNumber: Optional[str] = Field(default="")
+    currency: Optional[str] = Field(default="₹")
+    items: List[ExtractedReceiptItem] = Field(default_factory=list)
+    subtotal: float = Field(default=0.0, ge=0.0)
+    gst: Optional[float] = Field(default=0.0, ge=0.0)
+    gstRate: Optional[float] = Field(default=5.0, ge=0.0)
+    serviceCharge: Optional[float] = Field(default=0.0, ge=0.0)
+    serviceChargeRate: Optional[float] = Field(default=10.0, ge=0.0)
+    grandTotal: float = Field(default=0.0, ge=0.0)
+
+class OCRResponse(BaseModel):
+    success: bool = True
+    data: Optional[ExtractedReceiptData] = None
+    error: Optional[str] = None
+    message: Optional[str] = None
+```
 
 ---
 
@@ -291,88 +272,63 @@ export interface PersonShareSummary {
 
 ```text
 split-bill/
-├── .env                            # Environment variables (VITE_GEMINI_API_KEY)
-├── .env.example                    # Template for environment variables
-├── .gitignore                      # Git ignore configuration
-├── .prettierrc                     # Prettier formatting rules
-├── eslint.config.js                # ESLint 9 flat configuration
-├── index.html                      # HTML entry with Plus Jakarta Sans font
-├── package.json                    # Canonical dependencies and npm scripts
-├── package-lock.json               # Locked dependency tree
-├── postcss.config.js               # PostCSS configuration
-├── requirements.txt                # Notice regarding Node.js / npm dependency management
-├── tailwind.config.js              # Custom design tokens, teal palette, shadows, animations
-├── tsconfig.json                   # TypeScript configuration with @/* path alias
-├── tsconfig.node.json              # TypeScript configuration for Vite
+├── backend/                        # Python FastAPI Backend
+│   ├── app/
+│   │   ├── __init__.py             # Application package metadata
+│   │   ├── main.py                 # FastAPI application, CORS, exception handlers
+│   │   ├── config.py               # Centralized Pydantic settings & env management
+│   │   ├── schemas/
+│   │   │   ├── __init__.py
+│   │   │   └── ocr.py              # Pydantic models (ExtractedReceiptData, OCRResponse)
+│   │   ├── services/
+│   │   │   ├── __init__.py
+│   │   │   ├── gemini_service.py   # Google Gemini Vision OCR extraction service (Primary)
+│   │   │   └── openai_service.py   # Async OpenAI Vision OCR service (Alternative)
+│   │   ├── routes/
+│   │   │   ├── __init__.py
+│   │   │   ├── health.py           # GET /api/health
+│   │   │   └── ocr.py              # POST /api/ocr/extract
+│   │   └── middleware/
+│   │       ├── __init__.py
+│   │       └── rate_limiter.py     # Sliding-window IP rate limiter
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_health.py          # Health check endpoint tests
+│   │   ├── test_schemas.py         # Pydantic schema validation tests
+│   │   └── test_ocr_route.py       # OCR extraction route integration tests
+│   ├── requirements.txt            # Python dependencies (FastAPI, Uvicorn, Gemini, OpenAI, etc.)
+│   ├── .env.example                # Backend environment variables template (GEMINI_API_KEY)
+│   ├── .gitignore                  # Python-specific git ignore rules
+│   └── README.md                   # Backend architecture and setup documentation
+├── .env.example                    # Frontend environment variables template
+├── .gitignore                      # Root git ignore rules (includes backend/.env)
+├── package.json                    # Frontend dependencies and npm scripts
+├── package-lock.json               # Locked frontend dependency tree
+├── requirements.txt                # Root notice pointing to backend/requirements.txt
+├── tailwind.config.js              # Tailwind design tokens, teal palette, animations
+├── tsconfig.json                   # TypeScript configuration
 ├── vite.config.ts                  # Vite build configuration
 ├── docs/
-│   └── UI-SPEC.md                  # Authoritative UI and design specification
-├── public/
-│   └── favicon.svg                 # Brand favicon
-├── reference/                      # UI design references
+│   └── UI-SPEC.md                  # Authoritative UI specification
 └── src/
     ├── main.tsx                    # React application entrypoint
     ├── App.tsx                     # React Router routes (/ , /split, /review, /add-people, /assign, /share)
     ├── index.css                   # Global Tailwind utilities and soft neumorphic styles
-    ├── vite-env.d.ts               # Vite environment types
     ├── types/
     │   └── index.ts                # TypeScript interfaces (Bill, BillItem, DiningCompanion, PersonShareSummary)
     ├── context/
-    │   └── BillContext.tsx         # Unified shared state provider & arithmetic calculation engine
+    │   └── BillContext.tsx         # Unified state provider & arithmetic calculation engine
     ├── lib/
-    │   ├── gemini.ts               # Google Gemini OCR receipt extraction service
+    │   ├── api.ts                  # Backend REST API client (extractReceiptFromBackend, checkBackendHealth)
     │   └── utils.ts                # Formatting utilities (cn, formatCurrency, getInitials)
     ├── components/
-    │   ├── ui/
-    │   │   ├── Badge.tsx           # Status and diner badges
-    │   │   ├── Button.tsx          # Neumorphic button variants
-    │   │   ├── Card.tsx            # Card container primitives
-    │   │   └── LogoIcon.tsx        # Brand SVG icon
-    │   ├── landing/
-    │   │   ├── Navbar.tsx          # Navigation header with client-side links
-    │   │   ├── Hero.tsx            # Hero headline & Get Started CTA
-    │   │   ├── ReceiptPreviewCard.tsx # Interactive calculation demo card
-    │   │   ├── WorkflowSection.tsx # 4-step workflow overview
-    │   │   ├── FeaturesSection.tsx # 2x2 fairness feature grid
-    │   │   ├── CtaSection.tsx      # Bottom CTA card
-    │   │   └── Footer.tsx          # Footer with disclaimers
-    │   ├── split/
-    │   │   ├── BillProgressStepper.tsx # 5-step dynamic progress stepper
-    │   │   ├── SplitHeader.tsx      # Upload page header
-    │   │   ├── UploadDropzone.tsx   # Multi-file dropzone with 5MB validation & rate limiter
-    │   │   ├── OCRScannerCard.tsx   # Live laser OCR scan preview & Gemini parser
-    │   │   ├── PrivacyNotice.tsx    # Privacy assurance banner
-    │   │   ├── DemoBillBanner.tsx   # Quick demo bill launcher
-    │   │   ├── InputMethodTabs.tsx  # Upload method tabs
-    │   │   └── SplitFeatureCards.tsx # Bottom feature highlight cards
-    │   ├── review/
-    │   │   ├── ReceiptInfoCard.tsx  # Extracted restaurant metadata card
-    │   │   ├── ExtractedItemsTable.tsx # Editable line items table with quantity & price inputs
-    │   │   ├── BillSummary.tsx      # Subtotal, Tax %, Service Charge %, and Grand Total summary
-    │   │   ├── TotalsValidation.tsx # Arithmetic discrepancy validation card
-    │   │   └── ReviewActions.tsx    # Navigation actions (Back to Upload / Continue to Add People)
-    │   ├── people/
-    │   │   ├── AddPersonForm.tsx    # Diner input form with 8-color avatar picker
-    │   │   ├── PersonCard.tsx       # Editable companion card with delete/organizer controls
-    │   │   ├── PayerSelectorCard.tsx # Payer designation selector
-    │   │   ├── BillContextCard.tsx  # Compact bill context banner
-    │   │   ├── GroupSummaryCard.tsx # Group headcount and role summary
-    │   │   └── PeopleActions.tsx    # Navigation actions (Back to Review / Continue to Assign Items)
-    │   ├── assign/
-    │   │   ├── AssignHeaderCard.tsx # Restaurant metadata banner
-    │   │   ├── ItemAssignmentCard.tsx # Interactive solo/shared dish assignment card with Select All
-    │   │   ├── AssignmentProgressCard.tsx # Dynamic progress bar with filter tabs
-    │   │   ├── PersonSharesCard.tsx # Diners summary breakdown
-    │   │   ├── AssignmentTotalsCard.tsx # Bill reconciliation balance check card
-    │   │   └── AssignActions.tsx    # Navigation actions (Back to Add People / Continue to Share Split)
-    │   └── share/
-    │       ├── SettlementHeaderCard.tsx # Final restaurant info, payer, and organizer banner
-    │       ├── SettlementStatusCard.tsx # Settlement tracker, paid amount, and progress bar
-    │       ├── MemberSplitCard.tsx  # Individual diner card with paid toggle and dish accordion
-    │       ├── GroupSharingCard.tsx # WhatsApp group bill, copy link, and text summary tools
-    │       ├── UpiPaymentModal.tsx  # Dynamic peer-to-peer UPI payment & QR code modal
-    │       ├── ShareActions.tsx     # Navigation actions (Back to Assign / PDF / Start New Split)
-    │       └── PrintableReceipt.tsx # Monospace print/PDF receipt template
+    │   ├── ui/                     # Reusable design system primitives (Badge, Button, Card, LogoIcon)
+    │   ├── landing/                # Landing page sections (Hero, ReceiptPreviewCard, Workflow, Features, CTA, Footer)
+    │   ├── split/                  # Step 1 Upload components (Dropzone, OCRScannerCard, Stepper)
+    │   ├── review/                 # Step 2 Review components (ReceiptInfoCard, ExtractedItemsTable, BillSummary)
+    │   ├── people/                 # Step 3 People components (AddPersonForm, PersonCard, PayerSelectorCard)
+    │   ├── assign/                 # Step 4 Assign components (ItemAssignmentCard, AssignmentProgressCard, PersonSharesCard)
+    │   └── share/                  # Step 5 Share components (SettlementHeader, MemberSplitCard, UpiModal, PrintReceipt)
     └── pages/
         ├── LandingPage.tsx          # Route: /
         ├── SplitBillPage.tsx        # Route: /split (Step 1)
@@ -384,46 +340,66 @@ split-bill/
 
 ---
 
-## Local Development
+## Local Development & Setup
 
-### Prerequisites
-* **Node.js**: `v18.0.0` or higher
-* **npm**: `v9.0.0` or higher
+### 1. Backend Setup (FastAPI)
 
-### 1. Clone & Install
 ```bash
-git clone https://github.com/Jayesh72/split-the-bill.git
-cd split-bill
-npm install
-```
+# 1. Navigate to backend directory
+cd backend
 
-### 2. Configure Environment Variables
-Copy `.env.example` to `.env`:
-```bash
+# 2. Create Python virtual environment
+python -m venv .venv
+
+# 3. Activate virtual environment
+# Windows (PowerShell):
+.venv\Scripts\activate
+# macOS / Linux:
+# source .venv/bin/activate
+
+# 4. Install Python dependencies
+pip install -r requirements.txt
+
+# 5. Configure environment variables
 cp .env.example .env
-```
-Add your Google Gemini API key to `.env`:
-```env
-VITE_GEMINI_API_KEY=your_gemini_api_key_here
-```
-*(Note: A pre-filled demo bill is available in the UI to test the complete flow even without an API key).*
+# Edit .env and set your GEMINI_API_KEY
 
-### 3. Run Development Server
+# 6. Start FastAPI server
+uvicorn app.main:app --reload --port 8000
+```
+
+The backend will be running at [http://localhost:8000](http://localhost:8000).
+
+### 2. Frontend Setup (React + Vite)
+
+In a separate terminal:
+
 ```bash
+# 1. Install Node.js dependencies
+npm install
+
+# 2. Start Vite development server
 npm run dev
 ```
-Open [http://localhost:5173/](http://localhost:5173/) in your browser.
 
-### 4. Build & Preview
+The frontend will be running at [http://localhost:5173](http://localhost:5173).
+
+---
+
+## Testing & Quality Assurance
+
+### Run Backend Tests (Pytest)
 ```bash
-# Type check and build production bundle
-npm run build
-
-# Preview production build locally
-npm run preview
+cd backend
+.venv\Scripts\pytest backend/tests
 ```
 
-### 5. Linting
+### Run Frontend Typecheck & Build
+```bash
+npm run build
+```
+
+### Run Frontend Linter
 ```bash
 npm run lint
 ```

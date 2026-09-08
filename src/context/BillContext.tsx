@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
-import { Bill, BillItem, DiningCompanion, AvatarColorOption, PersonShareSummary } from '@/types';
-import { ExtractedReceiptData } from '@/lib/gemini';
+import { Bill, BillItem, DiningCompanion, AvatarColorOption, PersonShareSummary, ExtractedReceiptData } from '@/types';
 
 export const AVATAR_COLOR_PALETTE: AvatarColorOption[] = [
   { name: 'Teal', value: '#0D766E', bgClass: 'bg-[#0D766E]', borderClass: 'border-[#0D766E]', textClass: 'text-white' },

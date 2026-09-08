@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Loader2, RotateCcw, ArrowRight, AlertCircle, FileText, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { parseReceiptWithGemini, fileToBase64, ExtractedReceiptData } from '@/lib/gemini';
+import { extractReceiptFromBackend } from '@/lib/api';
+import { ExtractedReceiptData } from '@/types';
 import { useBill } from '@/context/BillContext';
 
 interface OCRScannerCardProps {
@@ -42,12 +43,11 @@ export const OCRScannerCard: React.FC<OCRScannerCardProps> = ({
 
     const runExtraction = async () => {
       try {
-        // Step progression simulation while API processes
+        // Step progression simulation while backend processes
         const t1 = setTimeout(() => setScanStep(2), 500);
         const t2 = setTimeout(() => setScanStep(3), 1200);
 
-        const base64 = await fileToBase64(primaryFile);
-        const result = await parseReceiptWithGemini(base64, primaryFile.type || 'image/jpeg');
+        const result = await extractReceiptFromBackend(primaryFile);
 
         clearTimeout(t1);
         clearTimeout(t2);
@@ -61,7 +61,7 @@ export const OCRScannerCard: React.FC<OCRScannerCardProps> = ({
         setScanStep(0);
         const errObj = err as { message?: string };
         setErrorMessage(
-          errObj.message || 'Failed to extract receipt data. Please check your Gemini API key.'
+          errObj.message || 'Failed to extract receipt data from backend. Please verify FastAPI backend is running.'
         );
       }
     };
@@ -112,7 +112,7 @@ export const OCRScannerCard: React.FC<OCRScannerCardProps> = ({
                   <div className="absolute top-3 left-4 right-4 z-20 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-[#2DD4BF] text-[11px] font-bold text-[#2DD4BF] flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2DD4BF]" />
-                      Extracting dishes & prices with Gemini AI...
+                      Extracting dishes & prices with FastAPI & OpenAI Vision...
                     </span>
                   </div>
                 </>
@@ -138,7 +138,7 @@ export const OCRScannerCard: React.FC<OCRScannerCardProps> = ({
                 No receipt uploaded yet
               </p>
               <p className="text-[11px] text-slate-500 max-w-xs">
-                Upload or drop a receipt on the left to start live Gemini OCR extraction.
+                Upload or drop a receipt on the left to start live FastAPI OCR extraction.
               </p>
             </div>
           )}

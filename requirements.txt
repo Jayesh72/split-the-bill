@@ -1,8 +1,12 @@
-# Split the Bill — Dependency Notice
+# Split the Bill — Python Backend Dependencies Notice
 #
-# This project is a frontend React + TypeScript + Vite web application.
-# All application dependencies are managed via Node.js / npm in `package.json`.
-# No Python runtime or Python packages are required to build or run this application.
+# The Python FastAPI backend dependencies are located in `backend/requirements.txt`.
 #
-# To install project dependencies, run:
+# To install the Python backend dependencies:
+#   cd backend
+#   python -m venv .venv
+#   .venv\Scripts\activate  (or source .venv/bin/activate on macOS/Linux)
+#   pip install -r requirements.txt
+#
+# To install frontend dependencies (Node.js / npm):
 #   npm install

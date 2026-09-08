@@ -79,3 +79,24 @@ export interface PersonShareSummary {
   totalShare: number;
   items: AssignedItemShare[];
 }
+
+export interface ExtractedReceiptItem {
+  name: string;
+  qty: number;
+  price: number;
+  isShared?: boolean;
+}
+
+export interface ExtractedReceiptData {
+  restaurantName: string;
+  location?: string;
+  billNumber?: string;
+  currency?: string;
+  items: ExtractedReceiptItem[];
+  subtotal: number;
+  gst?: number;
+  gstRate?: number;
+  serviceCharge?: number;
+  serviceChargeRate?: number;
+  grandTotal: number;
+}
