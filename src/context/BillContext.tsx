@@ -50,6 +50,19 @@ interface BillContextType {
   assignedAmount: number;
   unassignedAmount: number;
   personShares: PersonShareSummary[];
+
+  // Step 5: Settlement & Paid Status (personId -> boolean)
+  paidStatus: Record<string, boolean>;
+  togglePaidStatus: (personId: string) => void;
+  markAllPaid: (paid?: boolean) => void;
+  paidMembersCount: number;
+  pendingMembersCount: number;
+  totalPaidAmount: number;
+  totalPendingAmount: number;
+  isAllMembersPaid: boolean;
+  payer: DiningCompanion | null;
+  organizer: DiningCompanion | null;
+  resetAll: () => void;
 }
 
 export const DEMO_BILL: Bill = {
@@ -403,6 +416,38 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  // Step 5: Paid / Settlement state: personId -> boolean
+  const [paidStatus, setPaidStatus] = useState<Record<string, boolean>>({});
+
+  const togglePaidStatus = useCallback((personId: string) => {
+    setPaidStatus((prev) => ({
+      ...prev,
+      [personId]: !prev[personId],
+    }));
+  }, []);
+
+  const markAllPaid = useCallback((paid = true) => {
+    setPaidStatus(() => {
+      const next: Record<string, boolean> = {};
+      people.forEach((p) => {
+        next[p.id] = paid;
+      });
+      return next;
+    });
+  }, [people]);
+
+  const payer = useMemo((): DiningCompanion | null => {
+    if (payerId) {
+      const found = people.find((p) => p.id === payerId);
+      if (found) return found;
+    }
+    return people.find((p) => p.isOrganizer) || people[0] || null;
+  }, [people, payerId]);
+
+  const organizer = useMemo((): DiningCompanion | null => {
+    return people.find((p) => p.isOrganizer) || people[0] || null;
+  }, [people]);
+
   // Assignment Progress & Totals
   const assignedItemsCount = useMemo(() => {
     return bill.items.filter((item) => (assignments[item.id] || []).length > 0).length;
@@ -434,37 +479,111 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ) / 100;
   }, [bill.items, assignments]);
 
-  // Per-person calculated shares
+  // Per-person calculated shares with full item breakdown and total reconciliation
   const personShares = useMemo((): PersonShareSummary[] => {
-    return people.map((person) => {
-      let personSubtotal = 0;
-      let personItemsCount = 0;
+    if (people.length === 0) return [];
+
+    const peopleMap = new Map(people.map((p) => [p.id, p]));
+
+    const rawSummaries = people.map((person) => {
+      let rawSubtotal = 0;
+      const assignedItemBreakdown: PersonShareSummary['items'] = [];
 
       bill.items.forEach((item) => {
         const itemDiners = assignments[item.id] || [];
         if (itemDiners.includes(person.id)) {
-          personItemsCount += 1;
-          const share = item.totalPrice / itemDiners.length;
-          personSubtotal += share;
+          const dinerCount = itemDiners.length;
+          const share = item.totalPrice / dinerCount;
+          rawSubtotal += share;
+
+          const coDinerNames = itemDiners
+            .filter((id) => id !== person.id)
+            .map((id) => peopleMap.get(id)?.name || 'Diner');
+
+          assignedItemBreakdown.push({
+            item,
+            itemTotal: item.totalPrice,
+            assignedCount: dinerCount,
+            shareAmount: Math.round(share * 100) / 100,
+            isShared: dinerCount > 1,
+            coDinerNames,
+          });
         }
       });
 
-      const roundedSubtotal = Math.round(personSubtotal * 100) / 100;
-      const proportion = bill.subtotal > 0 ? roundedSubtotal / bill.subtotal : 0;
+      const roundedSubtotal = Math.round(rawSubtotal * 100) / 100;
+      const proportion = bill.subtotal > 0 ? rawSubtotal / bill.subtotal : (1 / people.length);
       const taxShare = Math.round(bill.tax * proportion * 100) / 100;
       const serviceChargeShare = Math.round(bill.serviceCharge * proportion * 100) / 100;
       const totalShare = Math.round((roundedSubtotal + taxShare + serviceChargeShare) * 100) / 100;
 
       return {
         person,
-        itemsCount: personItemsCount,
+        itemsCount: assignedItemBreakdown.length,
         subtotal: roundedSubtotal,
         taxShare,
         serviceChargeShare,
         totalShare,
+        items: assignedItemBreakdown,
       };
     });
-  }, [people, bill.items, bill.subtotal, bill.tax, bill.serviceCharge, assignments]);
+
+    // Reconcile rounding differences so sum(totalShare) strictly equals bill.grandTotal when all items are assigned
+    if (isAllItemsAssigned && rawSummaries.length > 0) {
+      const sumTotal = rawSummaries.reduce((acc, s) => acc + s.totalShare, 0);
+      const diff = Math.round((bill.grandTotal - sumTotal) * 100) / 100;
+
+      if (Math.abs(diff) > 0 && Math.abs(diff) < 0.10) {
+        // Adjust the person with the largest share (or first person) to reconcile exact total
+        let maxIndex = 0;
+        let maxShare = -1;
+        rawSummaries.forEach((s, idx) => {
+          if (s.totalShare > maxShare) {
+            maxShare = s.totalShare;
+            maxIndex = idx;
+          }
+        });
+
+        const target = rawSummaries[maxIndex];
+        target.totalShare = Math.round((target.totalShare + diff) * 100) / 100;
+        target.taxShare = Math.round((target.taxShare + diff) * 100) / 100;
+      }
+    }
+
+    return rawSummaries;
+  }, [people, bill.items, bill.subtotal, bill.tax, bill.serviceCharge, bill.grandTotal, assignments, isAllItemsAssigned]);
+
+  // Settlement totals
+  const paidMembersCount = useMemo(() => {
+    return people.filter((p) => !!paidStatus[p.id]).length;
+  }, [people, paidStatus]);
+
+  const pendingMembersCount = useMemo(() => {
+    return people.length - paidMembersCount;
+  }, [people.length, paidMembersCount]);
+
+  const totalPaidAmount = useMemo(() => {
+    return Math.round(
+      personShares.reduce((sum, s) => (paidStatus[s.person.id] ? sum + s.totalShare : sum), 0) * 100
+    ) / 100;
+  }, [personShares, paidStatus]);
+
+  const totalPendingAmount = useMemo(() => {
+    return Math.round(
+      personShares.reduce((sum, s) => (!paidStatus[s.person.id] ? sum + s.totalShare : sum), 0) * 100
+    ) / 100;
+  }, [personShares, paidStatus]);
+
+  const isAllMembersPaid = useMemo(() => {
+    return people.length > 0 && paidMembersCount === people.length;
+  }, [people.length, paidMembersCount]);
+
+  const resetAll = useCallback(() => {
+    resetToDemoBill();
+    setPeople([]);
+    setPayerId(null);
+    setPaidStatus({});
+  }, [resetToDemoBill]);
 
   return (
     <BillContext.Provider
@@ -498,6 +617,17 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
         assignedAmount,
         unassignedAmount,
         personShares,
+        paidStatus,
+        togglePaidStatus,
+        markAllPaid,
+        paidMembersCount,
+        pendingMembersCount,
+        totalPaidAmount,
+        totalPendingAmount,
+        isAllMembersPaid,
+        payer,
+        organizer,
+        resetAll,
       }}
     >
       {children}

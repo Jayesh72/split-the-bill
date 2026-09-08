@@ -61,6 +61,15 @@ export interface AvatarColorOption {
   textClass: string;
 }
 
+export interface AssignedItemShare {
+  item: BillItem;
+  itemTotal: number;
+  assignedCount: number;
+  shareAmount: number;
+  isShared: boolean;
+  coDinerNames: string[];
+}
+
 export interface PersonShareSummary {
   person: DiningCompanion;
   itemsCount: number;
@@ -68,7 +77,5 @@ export interface PersonShareSummary {
   taxShare: number;
   serviceChargeShare: number;
   totalShare: number;
+  items: AssignedItemShare[];
 }
-
-
-
