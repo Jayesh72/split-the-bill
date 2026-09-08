@@ -5,6 +5,8 @@ import { LandingPage } from './pages/LandingPage';
 import { SplitBillPage } from './pages/SplitBillPage';
 import { ReviewOCRPage } from './pages/ReviewOCRPage';
 import { AddPeoplePage } from './pages/AddPeoplePage';
+import { AssignItemsPage } from './pages/AssignItemsPage';
+import { ShareSplitPage } from './pages/ShareSplitPage';
 
 export const App: React.FC = () => {
   return (
@@ -15,6 +17,8 @@ export const App: React.FC = () => {
           <Route path="/split" element={<SplitBillPage />} />
           <Route path="/review" element={<ReviewOCRPage />} />
           <Route path="/add-people" element={<AddPeoplePage />} />
+          <Route path="/assign" element={<AssignItemsPage />} />
+          <Route path="/share" element={<ShareSplitPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

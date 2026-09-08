@@ -1,7 +1,18 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
-import { Bill, BillItem } from '@/types';
+import { Bill, BillItem, DiningCompanion, AvatarColorOption, PersonShareSummary } from '@/types';
 import { ExtractedReceiptData } from '@/lib/gemini';
+
+export const AVATAR_COLOR_PALETTE: AvatarColorOption[] = [
+  { name: 'Teal', value: '#0D766E', bgClass: 'bg-[#0D766E]', borderClass: 'border-[#0D766E]', textClass: 'text-white' },
+  { name: 'Blue', value: '#2563EB', bgClass: 'bg-[#2563EB]', borderClass: 'border-[#2563EB]', textClass: 'text-white' },
+  { name: 'Purple', value: '#7C3AED', bgClass: 'bg-[#7C3AED]', borderClass: 'border-[#7C3AED]', textClass: 'text-white' },
+  { name: 'Pink', value: '#DB2777', bgClass: 'bg-[#DB2777]', borderClass: 'border-[#DB2777]', textClass: 'text-white' },
+  { name: 'Orange', value: '#EA580C', bgClass: 'bg-[#EA580C]', borderClass: 'border-[#EA580C]', textClass: 'text-white' },
+  { name: 'Emerald', value: '#059669', bgClass: 'bg-[#059669]', borderClass: 'border-[#059669]', textClass: 'text-white' },
+  { name: 'Amber', value: '#D97706', bgClass: 'bg-[#D97706]', borderClass: 'border-[#D97706]', textClass: 'text-white' },
+  { name: 'Indigo', value: '#4F46E5', bgClass: 'bg-[#4F46E5]', borderClass: 'border-[#4F46E5]', textClass: 'text-white' },
+];
 
 interface BillContextType {
   bill: Bill;
@@ -15,6 +26,30 @@ interface BillContextType {
   resetToDemoBill: () => void;
   isTotalsMatching: boolean;
   totalsDiff: number;
+  
+  // People / Dining Companions
+  people: DiningCompanion[];
+  setPeople: React.Dispatch<React.SetStateAction<DiningCompanion[]>>;
+  addPerson: (name: string, avatarColor?: string, isOrganizer?: boolean) => boolean;
+  updatePerson: (id: string, updates: Partial<DiningCompanion>) => void;
+  removePerson: (id: string) => { success: boolean; reason?: string };
+  setOrganizer: (id: string) => void;
+  
+  // Payer (Who settled the receipt)
+  payerId: string | null;
+  setPayerId: (id: string | null) => void;
+
+  // Step 4: Item Assignments (itemId -> personId[])
+  assignments: Record<string | number, string[]>;
+  assignItem: (itemId: string | number, personIds: string[]) => void;
+  togglePersonOnItem: (itemId: string | number, personId: string) => void;
+  clearItemAssignment: (itemId: string | number) => void;
+  assignedItemsCount: number;
+  unassignedItemsCount: number;
+  isAllItemsAssigned: boolean;
+  assignedAmount: number;
+  unassignedAmount: number;
+  personShares: PersonShareSummary[];
 }
 
 export const DEMO_BILL: Bill = {
@@ -110,6 +145,11 @@ function recalculateBill(bill: Bill): Bill {
 
 export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [bill, setBill] = useState<Bill>(() => recalculateBill(DEMO_BILL));
+  // Clean empty people state - NO hardcoded default people
+  const [people, setPeople] = useState<DiningCompanion[]>([]);
+  const [payerId, setPayerId] = useState<string | null>(null);
+  // Assignments state: itemId -> personId[]
+  const [assignments, setAssignments] = useState<Record<string | number, string[]>>({});
 
   const updateItem = useCallback((id: string | number, updates: Partial<Omit<BillItem, 'id' | 'totalPrice'>>) => {
     setBill((prevBill) => {
@@ -165,6 +205,11 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
         items: filteredItems,
       });
     });
+    setAssignments((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
 
   const setTaxRate = useCallback((rate: number) => {
@@ -216,10 +261,12 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setBill(recalculateBill(newBill));
+    setAssignments({});
   }, []);
 
   const resetToDemoBill = useCallback(() => {
     setBill(recalculateBill(DEMO_BILL));
+    setAssignments({});
   }, []);
 
   const totalsDiff = useMemo(() => {
@@ -229,6 +276,195 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isTotalsMatching = useMemo(() => {
     return Math.abs(totalsDiff) < 0.5;
   }, [totalsDiff]);
+
+  // People / Dining Companions Actions
+  const addPerson = useCallback((name: string, avatarColor?: string, isOrganizer = false): boolean => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+
+    setPeople((prev) => {
+      // Pick next available color from palette
+      const assignedColor =
+        avatarColor ||
+        AVATAR_COLOR_PALETTE[prev.length % AVATAR_COLOR_PALETTE.length].value;
+
+      const isFirst = prev.length === 0;
+
+      const newPerson: DiningCompanion = {
+        id: `person-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        name: trimmed,
+        avatarColor: assignedColor,
+        isOrganizer: isFirst ? true : isOrganizer,
+      };
+
+      // If this is the first person and no payer was selected yet, auto-select them as default payer
+      if (isFirst) {
+        setPayerId((currentPayer) => currentPayer || newPerson.id);
+      }
+
+      return [...prev, newPerson];
+    });
+
+    return true;
+  }, []);
+
+  const updatePerson = useCallback((id: string, updates: Partial<DiningCompanion>) => {
+    setPeople((prev) =>
+      prev.map((person) => {
+        if (person.id === id) {
+          const updatedName = updates.name !== undefined ? updates.name.trim() : person.name;
+          return {
+            ...person,
+            ...updates,
+            name: updatedName || person.name,
+          };
+        }
+        return person;
+      })
+    );
+  }, []);
+
+  const removePerson = useCallback((id: string): { success: boolean; reason?: string } => {
+    let result: { success: boolean; reason?: string } = { success: true };
+
+    setPeople((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) {
+        result = { success: false, reason: 'Person not found' };
+        return prev;
+      }
+
+      const remaining = prev.filter((p) => p.id !== id);
+
+      // If removed person was the payer, reset payerId to null
+      setPayerId((currentPayer) => (currentPayer === id ? null : currentPayer));
+
+      // If the removed person was the organizer and other members remain, reassign organizer to the first remaining member
+      if (target.isOrganizer && remaining.length > 0) {
+        if (!remaining.some((p) => p.isOrganizer)) {
+          remaining[0].isOrganizer = true;
+        }
+      }
+
+      return remaining;
+    });
+
+    // Clean up assignment references to this removed person
+    setAssignments((prev) => {
+      const next: Record<string | number, string[]> = {};
+      for (const itemId in prev) {
+        const filtered = (prev[itemId] || []).filter((pid) => pid !== id);
+        if (filtered.length > 0) {
+          next[itemId] = filtered;
+        }
+      }
+      return next;
+    });
+
+    return result;
+  }, []);
+
+  const setOrganizer = useCallback((id: string) => {
+    setPeople((prev) =>
+      prev.map((p) => ({
+        ...p,
+        isOrganizer: p.id === id,
+      }))
+    );
+  }, []);
+
+  // Step 4: Assignments Actions & Dynamic Calculations
+  const assignItem = useCallback((itemId: string | number, personIds: string[]) => {
+    setAssignments((prev) => ({
+      ...prev,
+      [itemId]: personIds,
+    }));
+  }, []);
+
+  const togglePersonOnItem = useCallback((itemId: string | number, personId: string) => {
+    setAssignments((prev) => {
+      const current = prev[itemId] || [];
+      const isAssigned = current.includes(personId);
+      const updated = isAssigned
+        ? current.filter((id) => id !== personId)
+        : [...current, personId];
+      return {
+        ...prev,
+        [itemId]: updated,
+      };
+    });
+  }, []);
+
+  const clearItemAssignment = useCallback((itemId: string | number) => {
+    setAssignments((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  }, []);
+
+  // Assignment Progress & Totals
+  const assignedItemsCount = useMemo(() => {
+    return bill.items.filter((item) => (assignments[item.id] || []).length > 0).length;
+  }, [bill.items, assignments]);
+
+  const unassignedItemsCount = useMemo(() => {
+    return bill.items.length - assignedItemsCount;
+  }, [bill.items.length, assignedItemsCount]);
+
+  const isAllItemsAssigned = useMemo(() => {
+    return bill.items.length > 0 && assignedItemsCount === bill.items.length;
+  }, [bill.items.length, assignedItemsCount]);
+
+  const assignedAmount = useMemo(() => {
+    return Math.round(
+      bill.items.reduce((sum, item) => {
+        const isAssigned = (assignments[item.id] || []).length > 0;
+        return isAssigned ? sum + item.totalPrice : sum;
+      }, 0) * 100
+    ) / 100;
+  }, [bill.items, assignments]);
+
+  const unassignedAmount = useMemo(() => {
+    return Math.round(
+      bill.items.reduce((sum, item) => {
+        const isAssigned = (assignments[item.id] || []).length > 0;
+        return isAssigned ? sum : sum + item.totalPrice;
+      }, 0) * 100
+    ) / 100;
+  }, [bill.items, assignments]);
+
+  // Per-person calculated shares
+  const personShares = useMemo((): PersonShareSummary[] => {
+    return people.map((person) => {
+      let personSubtotal = 0;
+      let personItemsCount = 0;
+
+      bill.items.forEach((item) => {
+        const itemDiners = assignments[item.id] || [];
+        if (itemDiners.includes(person.id)) {
+          personItemsCount += 1;
+          const share = item.totalPrice / itemDiners.length;
+          personSubtotal += share;
+        }
+      });
+
+      const roundedSubtotal = Math.round(personSubtotal * 100) / 100;
+      const proportion = bill.subtotal > 0 ? roundedSubtotal / bill.subtotal : 0;
+      const taxShare = Math.round(bill.tax * proportion * 100) / 100;
+      const serviceChargeShare = Math.round(bill.serviceCharge * proportion * 100) / 100;
+      const totalShare = Math.round((roundedSubtotal + taxShare + serviceChargeShare) * 100) / 100;
+
+      return {
+        person,
+        itemsCount: personItemsCount,
+        subtotal: roundedSubtotal,
+        taxShare,
+        serviceChargeShare,
+        totalShare,
+      };
+    });
+  }, [people, bill.items, bill.subtotal, bill.tax, bill.serviceCharge, assignments]);
 
   return (
     <BillContext.Provider
@@ -244,6 +480,24 @@ export const BillProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetToDemoBill,
         isTotalsMatching,
         totalsDiff,
+        people,
+        setPeople,
+        addPerson,
+        updatePerson,
+        removePerson,
+        setOrganizer,
+        payerId,
+        setPayerId,
+        assignments,
+        assignItem,
+        togglePersonOnItem,
+        clearItemAssignment,
+        assignedItemsCount,
+        unassignedItemsCount,
+        isAllItemsAssigned,
+        assignedAmount,
+        unassignedAmount,
+        personShares,
       }}
     >
       {children}

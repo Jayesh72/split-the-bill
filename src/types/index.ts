@@ -46,17 +46,29 @@ export interface DinerShare {
   status?: 'Paid' | 'Pending';
 }
 
-export interface BillSummary {
-  restaurantName: string;
-  isVerified: boolean;
-  location: string;
-  billNumber: string;
-  companionsCount: number;
-  subtotal: number;
-  gst: number;
-  gstRate: number;
-  serviceCharge: number;
-  serviceChargeRate: number;
-  grandTotal: number;
+export interface DiningCompanion {
+  id: string;
+  name: string;
+  avatarColor: string;
+  isOrganizer: boolean;
 }
+
+export interface AvatarColorOption {
+  name: string;
+  value: string;
+  bgClass: string;
+  borderClass: string;
+  textClass: string;
+}
+
+export interface PersonShareSummary {
+  person: DiningCompanion;
+  itemsCount: number;
+  subtotal: number;
+  taxShare: number;
+  serviceChargeShare: number;
+  totalShare: number;
+}
+
+
 
